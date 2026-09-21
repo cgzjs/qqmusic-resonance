@@ -7,6 +7,7 @@ import { coverWaveformPeaks, nearbyListeners } from "@/lib/resonance/demo-data";
 import { OrbitalDecorations } from "@/components/resonance/OrbitalDecorations";
 import { AlbumTile } from "@/components/resonance/AlbumTile";
 import "@/app/landing.css";
+import { AppearanceToggle } from "./Appearance";
 
 const chapters = [
   { name: "discover", label: "发现", icon: Crosshair },
@@ -42,7 +43,7 @@ function WaveformBars({ played = false }: { played?: boolean }) {
 /** Fixed waveform + advancing playhead, following WaveSurfer's bars example. */
 function SharedWave() {
   return (
-    <div className="signal-sync" role="img" aria-label="同步跟听演示：两位听众共享同一段波形与播放进度">
+    <div className="signal-sync" role="img" aria-label="同步跟听：两位听众共享同一段波形与播放进度">
       <div className="signal-sync__people" aria-hidden="true"><span><Headphones size={15} />YOU</span><span className="signal-sync__connection"><Link2 size={16} /></span><span>TA<Headphones size={15} /></span></div>
       <div className="listening-waveform" aria-hidden="true">
         <span className="listening-waveform__baseline" />
@@ -78,7 +79,7 @@ function ExchangePreview() {
 
 function SignalDisplay({ chapterIndex }: { chapterIndex: number }) {
   return (
-    <section className="signal-console" data-mode={chapterIndex} aria-label={`${chapters[chapterIndex].label}演示预览`}>
+    <section className="signal-console" data-mode={chapterIndex} aria-label={`${chapters[chapterIndex].label}预览`}>
       <div className="signal-display" data-mode={chapterIndex}>
         {chapterIndex === 0 && <div className="signal-radar" role="img" aria-label="音乐雷达示意：你与附近四位听众的音乐相遇">
           <svg viewBox="0 0 480 290" aria-hidden="true">
@@ -110,6 +111,7 @@ export function ResonanceLanding() {
         <header className="terminal-header">
           <Link href="/" className="terminal-brand" aria-label="同频首页"><AudioLines aria-hidden="true" /><strong>同频<span>RESONANCE</span></strong></Link>
           <button type="button" className="terminal-motion" aria-pressed={isPaused} aria-label={isPaused ? "播放装饰动效" : "暂停装饰动效"} title={isPaused ? "播放动效" : "暂停动效"} onClick={() => setIsPaused(value => !value)}>{isPaused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}</button>
+          <AppearanceToggle />
         </header>
         <main id="cover-main" className="terminal-main" tabIndex={-1}>
           <div className="terminal-intro">
@@ -123,7 +125,7 @@ export function ResonanceLanding() {
             <nav className="terminal-chapters" aria-label="封面章节">{chapters.map((item, index) => <button key={item.name} type="button" aria-pressed={chapterIndex === index} onClick={() => setChapterIndex(index)}><item.icon size={19} strokeWidth={1.4} aria-hidden="true" /><span>{item.label}</span></button>)}</nav>
           </div>
         </main>
-        <span className="sr-only" aria-live="polite">{chapters[chapterIndex].label}演示预览</span>
+        <span className="sr-only" aria-live="polite">{chapters[chapterIndex].label}预览</span>
       </div>
     </div>
   );

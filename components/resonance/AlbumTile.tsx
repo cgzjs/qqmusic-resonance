@@ -19,6 +19,7 @@ export function AlbumTile({ accent, size = "md", className = "", coverUrl }: Alb
   return (
     <div
       className={`album-tile album-tile--${size} ${className}`}
+      data-has-cover={!!coverUrl}
       style={{ "--album-accent": accent } as CSSProperties}
       aria-hidden="true"
     >

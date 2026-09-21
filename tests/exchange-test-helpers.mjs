@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { mockAccount, accountHeaders } from "./host-test-helpers.mjs";
-export async function setupExchangeRoom(base) {
+export async function setupExchangeRoom(base, trackIds = ["demo-night", "demo-glass"]) {
   const a = await mockAccount(base), b = await mockAccount(base, "模拟听众 B");
   const nearby = async (action, account, token, body) => {
     const response = await fetch(`${base}/api/nearby/${action}`, { method: body ? "POST" : "GET", headers: { ...accountHeaders(account.session), "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     assert.ok(response.ok, `${action}: ${response.status}`); return response.json();
   };
-  const aPresence = await nearby("start", a, null, { trackId: "demo-night" });
-  const bPresence = await nearby("start", b, null, { trackId: "demo-glass" });
+  const aPresence = await nearby("start", a, null, { trackId: trackIds[0] });
+  const bPresence = await nearby("start", b, null, { trackId: trackIds[1] });
   const invite = await nearby("invite", a, aPresence.token, { targetId: bPresence.self.id });
   const accepted = await nearby("respond", b, bPresence.token, { inviteId: invite.invite.id, decision: "accept" });
   const followed = await nearby("state", a, aPresence.token);

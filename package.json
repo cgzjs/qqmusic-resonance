@@ -22,7 +22,14 @@
     "test:exchanges:durability": "node --test tests/exchange-durability.integration.mjs",
     "test:nearby:integration": "node --test tests/nearby-server.integration.mjs",
     "test:host:integration": "node --test tests/host-server.integration.mjs",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "test:recovery": "node --test tests/client-recovery.test.mjs",
+    "test:playlist:integration": "node --test tests/current-playlist.integration.mjs",
+    "test:received": "node --experimental-strip-types --test tests/received-songs.test.mjs",
+    "test:received:integration": "node --test tests/received-songs.integration.mjs",
+    "test:replies:integration": "node --test tests/demo-replies.integration.mjs",
+    "test:login": "node --test tests/demo-login.test.mjs",
+    "test:login:integration": "node --test tests/tab-login.integration.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -60,8 +67,10 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
+    "esbuild": "^0.28.0",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.4",
+    "jsdom": "^26.1.0",
     "music-metadata": "11.15.0",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",

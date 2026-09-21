@@ -28,7 +28,7 @@ export function MatchDetail({ listener, onBack, onListen, onExchange }: MatchDet
           <span>音乐同频</span>
         </div>
         <h3>{listener.track}</h3>
-        <p>{listener.artist} · 模拟听众</p>
+        <p>{listener.artist}</p>
       </div>
 
       <div className="insight-card">
@@ -39,7 +39,7 @@ export function MatchDetail({ listener, onBack, onListen, onExchange }: MatchDet
         <div className="tag-row">
           {listener.genres.map((genre) => <span key={genre}>{genre}</span>)}
         </div>
-        <p>这组演示听众偏好 {listener.genres.join("、")}。同频度用于展示匹配效果。</p>
+        <p>从 {listener.genres.join("、")}，找到下一首喜欢的歌。</p>
       </div>
 
       <div className="privacy-line">

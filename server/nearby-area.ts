@@ -3,7 +3,8 @@ import { audioTracks } from "../lib/resonance/demo-data";
 import { UUID_PATTERN } from "../lib/resonance/room-protocol";
 import { INVITE_MS, PRESENCE_MS, type NearbyInvite, type NearbyPeer, type NearbySnapshot, type SessionTicket } from "../lib/resonance/nearby-protocol";
 
-type Participant = NearbyPeer & { accountId: string; token: string; lastSeen: number; lastInvite: number; inviteId: string | null; ticket: SessionTicket | null; pairs: Record<string, number> };
+type Participant = NearbyPeer & { accountId: string; sessionHash?: string; token: string; lastSeen: number; lastInvite: number; inviteId: string | null; ticket: SessionTicket | null; pairs: Record<string, number> };
+const digestSession = async (token: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)))).map(byte => byte.toString(16).padStart(2, "0")).join("");
 type State = { people: Record<string, Participant>; invites: Record<string, NearbyInvite> };
 
 // One explicitly labelled demonstration area. It does not infer physical proximity.
@@ -45,7 +46,8 @@ export class NearbyArea extends DurableObject<Cloudflare.Env> {
         if (!body || typeof body !== "object" || Array.isArray(body)) return fail("INVALID_BODY", 400);
       }
       if (action === "revoke") {
-        for (const peer of Object.values(this.state.people)) if (peer.accountId === body.accountId) {
+        const sessionHash = typeof body.accountToken === "string" ? await digestSession(body.accountToken) : null;
+        for (const peer of Object.values(this.state.people)) if (peer.accountId === body.accountId && (!sessionHash || peer.sessionHash === sessionHash)) {
           const invite = peer.inviteId && this.state.invites[peer.inviteId];
           if (invite && invite.status === "pending") invite.status = "cancelled";
           delete this.state.people[peer.id];
@@ -58,7 +60,7 @@ export class NearbyArea extends DurableObject<Cloudflare.Env> {
         if (!audioTracks.some(track => track.id === body.trackId)) return fail("INVALID_TRACK", 400);
         if (Object.keys(this.state.people).length >= 100) return fail("AREA_FULL", 429);
         const id = crypto.randomUUID(), token = crypto.randomUUID();
-        const person: Participant = { id, token, accountId, alias: `听众 ${id.slice(0, 4).toUpperCase()}`, trackId: body.trackId as string, lastSeen: now, lastInvite: 0, inviteId: null, ticket: null, pairs: {} };
+        const person: Participant = { id, token, accountId, sessionHash: await digestSession(request.headers.get("X-Account-Token") ?? ""), alias: `听众 ${id.slice(0, 4).toUpperCase()}`, trackId: body.trackId as string, lastSeen: now, lastInvite: 0, inviteId: null, ticket: null, pairs: {} };
         this.state.people[id] = person; await this.save();
         return reply({ token, ...this.snapshot(person) }, 201);
       }

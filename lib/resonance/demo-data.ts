@@ -102,7 +102,7 @@ export const playableListeners: NearbyListener[] = audioTracks.map((track, index
     audioTrackId: track.id, sharedArtists: [track.artist],
     suggestions: audioTracks.filter(item => item.id !== track.id).map(item => ({
       id: item.id, track: item.track, artist: item.artist, accent: item.accent, coverUrl: item.coverUrl,
-      reason: "来自当前模拟歌单",
+      reason: "来自当前歌单",
     })),
   };
 });

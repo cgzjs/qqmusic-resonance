@@ -14,7 +14,7 @@ test("host identity persists data, separates accounts and rejects forged identit
   await api("/api/host/data", a.session, { action: "listen", trackId: "demo-glass", id: eventId });
   const aData = await api("/api/host/data", a.session, { action: "listen", trackId: "demo-glass", id: eventId });
   assert.deepEqual(aData.favoriteIds, ["demo-night"]); assert.equal(aData.history.length, 1);
-  assert.deepEqual(await api("/api/host/data", b.session), { favoriteIds: [], listenLaterIds: [], events: [], history: [], onlineExchanges: [] });
+  assert.deepEqual(await api("/api/host/data", b.session), { favoriteIds: [], listenLaterIds: [], events: [], history: [], onlineExchanges: [], readExchangeIds: [], demoReplies: [] });
   await api("/api/host/data", { ...b.session, accountId: a.session.accountId }, undefined, 401);
   await api("/api/host/resume", a.session, { deviceKey: b.identity.deviceKey }, 401);
   await api("/api/host/data", a.session, { action: "favorite", trackId: "not-licensed" }, 400);

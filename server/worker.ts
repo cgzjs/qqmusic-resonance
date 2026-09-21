@@ -32,8 +32,11 @@ const worker = {
       }
       if (url.pathname.startsWith("/api/host/")) {
         try {
+          const logoutOptions = url.pathname.endsWith("/logout") ? await request.clone().json<{ scope?: string }>() : null;
           const response = await hostApi(request, env);
-          if (url.pathname.endsWith("/logout") && response.ok) await env.NEARBY.get(env.NEARBY.idFromName("demo-area-v1")).fetch(new Request("https://nearby.internal/revoke", { method: "POST", body: JSON.stringify({ accountId: request.headers.get("X-Account-Id") }) }));
+          if (url.pathname.endsWith("/logout") && response.ok) {
+            await env.NEARBY.get(env.NEARBY.idFromName("demo-area-v1")).fetch(new Request("https://nearby.internal/revoke", { method: "POST", body: JSON.stringify({ accountId: request.headers.get("X-Account-Id"), ...(logoutOptions?.scope === "session" ? { accountToken: request.headers.get("X-Account-Token") } : {}) }) }));
+          }
           return response;
         } catch { return Response.json({ error: "INVALID_BODY" }, { status: 400 }); }
       }

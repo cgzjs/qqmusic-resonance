@@ -17,6 +17,7 @@ export function useResonancePlayer() {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(.65);
   const [error, setError] = useState<string | null>(null);
+  const [wantsPlayback, setWantsPlayback] = useState(false);
   const invalidateRequests = useCallback(() => { requestRef.current++; }, []);
   const releaseSource = useCallback(() => {
     loadController.current?.abort(); loadController.current = null; loadRef.current = null;
@@ -36,8 +37,8 @@ export function useResonancePlayer() {
     const playing = () => { setStatus("playing"); setError(null); };
     const pause = () => { if (trackRef.current && !audio.ended && !audio.error) setStatus("paused"); };
     const waiting = () => { if (!audio.paused) setStatus("loading"); };
-    const ended = () => { setStatus("ended"); time(); };
-    const failed = () => { if (audio.error) { setStatus("error"); setError("音频加载失败，请重试。"); } };
+    const ended = () => { setWantsPlayback(false); setStatus("ended"); time(); };
+    const failed = () => { if (audio.error) { setWantsPlayback(false); setStatus("error"); setError("音频加载失败，请重试。"); } };
     const events = { loadedmetadata: metadata, durationchange: metadata, timeupdate: time, playing, pause, waiting, ended, error: failed };
     Object.entries(events).forEach(([name, callback]) => audio.addEventListener(name, callback));
     return () => {
@@ -85,7 +86,7 @@ export function useResonancePlayer() {
         audio.src = url; audio.load();
       } catch (cause) {
         if (loadController.current === controller && (!controller.signal.aborted || timedOut)) {
-          loadRef.current = null; setStatus("error");
+          loadRef.current = null; setWantsPlayback(false); setStatus("error");
           setError(timedOut ? "音频加载超时，请重试。" : cause instanceof Error && sourceErrors[cause.message] ? sourceErrors[cause.message] : "音频加载失败，请重试。");
         }
         throw cause;
@@ -96,6 +97,7 @@ export function useResonancePlayer() {
   }, [releaseSource]);
 
   const prepareTrack = useCallback((nextTrack: AudioTrack) => {
+    setWantsPlayback(false);
     void loadTrack(nextTrack).catch(() => { /* The loader exposes the error to the UI. */ });
   }, [loadTrack]);
 
@@ -104,6 +106,7 @@ export function useResonancePlayer() {
     if (!audio) return false;
     const loading = loadTrack(nextTrack);
     const request = ++requestRef.current;
+    setWantsPlayback(true);
     setError(null);
     setStatus("loading");
     try {
@@ -117,6 +120,7 @@ export function useResonancePlayer() {
     } catch (cause) {
       if (request !== requestRef.current) return false;
       const blocked = cause instanceof DOMException && cause.name === "NotAllowedError";
+      setWantsPlayback(false);
       setStatus("error");
       setError(blocked ? "浏览器未允许播放，请再点一次播放。" : cause instanceof Error && sourceErrors[cause.message] ? sourceErrors[cause.message] : "暂时无法播放这首歌，请检查格式后重试。");
       return false;
@@ -125,6 +129,7 @@ export function useResonancePlayer() {
 
   const pause = useCallback(() => {
     requestRef.current++;
+    setWantsPlayback(false);
     audioRef.current?.pause();
     if (trackRef.current) setStatus("paused");
   }, []);
@@ -153,6 +158,7 @@ export function useResonancePlayer() {
   }, []);
   const stop = useCallback(() => {
     requestRef.current++;
+    setWantsPlayback(false);
     const audio = audioRef.current;
     trackRef.current = null;
     if (audio) { audio.pause(); audio.removeAttribute("src"); audio.load(); }
@@ -160,7 +166,7 @@ export function useResonancePlayer() {
     setTrack(null); setCurrentTime(0); setDuration(0); setStatus("idle"); setError(null);
   }, [releaseSource]);
 
-  return { audioRef, player: { track, status, currentTime, duration, volume, error, prepareTrack, playTrack, pause, toggle, seek, changeVolume, readPosition, changePlaybackRate, stop } };
+  return { audioRef, player: { track, status, currentTime, duration, volume, error, wantsPlayback, prepareTrack, playTrack, pause, toggle, seek, changeVolume, readPosition, changePlaybackRate, stop } };
 }
 
 export type ResonancePlayer = ReturnType<typeof useResonancePlayer>["player"];

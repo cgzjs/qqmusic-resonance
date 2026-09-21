@@ -1,4 +1,17 @@
-# 内置试听音源
+# 音源记录
+
+## 当前自备歌单
+
+2026-09-21 由用户提供，用于本地插件播放与双页面联调。以下录音不是项目原创，也不包含在代码的 MIT 授权中；未核验再分发授权。
+
+| 文件 | 歌曲 | 艺人 |
+| --- | --- | --- |
+| yorushika-miyakoochi.mp3 | 都落ち | ヨルシカ |
+| yorushika-matasaburo.mp3 | 又三郎 | ヨルシカ |
+| yorushika-roujin-to-umi.mp3 | 老人と海 | ヨルシカ |
+| sana-kotoba-no-iranai-yakusoku.ogg | 言葉のいらない約束 | 鎖那 |
+
+## 原创合成试听（历史歌单）
 
 四段音源由本项目的 `scripts/generate-demo-audio.mjs` 原创合成，用于单人交互演示，不是 Fishmans、Nujabes 等艺人的录音，也不接入外部曲库。
 

@@ -52,6 +52,10 @@ export function useListeningRoom(roomId: string) {
   const lastMessageRef = useRef(0);
   const bestRttRef = useRef(Infinity);
   const credentialsRef = useRef<{ token: string; clientId: string; accountToken?: string } | null>(null);
+  const synchronizedRef = useRef(false);
+  const resumePingRef = useRef<number | null>(null);
+  // Read by audio before React commits a lifecycle update.
+  const isSynchronized = useCallback(() => synchronizedRef.current && navigator.onLine && !leavingRef.current && Date.now() - lastMessageRef.current < 12_000, []);
 
   const settleReaction = useCallback((status: ReactionDelivery["status"], error?: string) => {
     const current = outgoingRef.current;
@@ -79,12 +83,17 @@ export function useListeningRoom(roomId: string) {
     const credentials = credentialsRef.current;
     if (!credentials || leavingRef.current) return;
     clearTimers();
+    synchronizedRef.current = false; resumePingRef.current = null;
     const generation = ++generationRef.current;
     socketRef.current?.close();
+    if (!navigator.onLine) { setConnection("reconnecting"); setError("网络已断开，恢复后重新确认播放状态。"); return; }
     setConnection(attemptsRef.current ? "reconnecting" : "connecting");
     const retry = () => {
       if (generation !== generationRef.current || leavingRef.current) return;
+      generationRef.current++;
+      socketRef.current?.close();
       clearTimers();
+      synchronizedRef.current = false;
       clearReactions();
       if (attemptsRef.current >= 8) { setConnection("error"); setError("暂时无法连接房间，请检查网络后重试。"); return; }
       const delay = Math.min(750 * 2 ** attemptsRef.current++, 8000);
@@ -99,18 +108,17 @@ export function useListeningRoom(roomId: string) {
         try { available = await fetch(`/api/rooms/${roomId}/status`, { cache: "no-store", signal: probe.signal }); }
         finally { clearTimeout(deadline); }
         if (generation !== generationRef.current || leavingRef.current) return;
-        if (available.status === 404) { setConnection("closed"); setError(errors.ROOM_NOT_FOUND); return; }
+        if (available.status === 404) { leavingRef.current = true; clearReactions(); exchangeCommandRef.current = null; setExchangeRequest("idle"); setExchangeError(null); setConnection("closed"); setError(errors.ROOM_NOT_FOUND); return; }
         if (!available.ok) { retry(); return; }
         const url = new URL(`/api/rooms/${roomId}/socket`, window.location.origin);
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
         const socket = new WebSocket(url);
         socketRef.current = socket;
         lastMessageRef.current = Date.now();
-        timerRef.current = setTimeout(() => socket.close(), 8000);
+        timerRef.current = setTimeout(() => { socket.close(); retry(); }, 8000);
         socket.onopen = () => {
           if (generation !== generationRef.current || leavingRef.current) { socket.close(); return; }
-          if (timerRef.current) clearTimeout(timerRef.current);
-          timerRef.current = null;
+          // Keep the deadline until authenticated welcome, not merely TCP open.
           socket.send(JSON.stringify({ type: "hello", ...credentials }));
           heartbeatRef.current = setInterval(() => {
             if (Date.now() - lastMessageRef.current > 20_000) { socket.close(); return; }
@@ -118,8 +126,7 @@ export function useListeningRoom(roomId: string) {
           }, 4000);
         };
         socket.onmessage = event => {
-          if (generation !== generationRef.current) return;
-          lastMessageRef.current = Date.now();
+          if (generation !== generationRef.current || leavingRef.current) return;
           let message;
           try { message = JSON.parse(event.data); } catch { return; }
           if (message.type === "exchange-result" && message.requestId === exchangeCommandRef.current?.id) {
@@ -132,6 +139,7 @@ export function useListeningRoom(roomId: string) {
             settleReaction(message.status, typeof message.error === "string" ? message.error : undefined); return;
           }
           if (message.type === "reaction") {
+            if (!isSynchronized()) return;
             const item = message.event as RoomReaction | undefined;
             if (!roleRef.current || !item || !UUID_PATTERN.test(item.id ?? "") || !["wave", "heart"].includes(item.kind) || !["host", "guest"].includes(item.from) || item.from === roleRef.current || !Number.isFinite(item.createdAt) || typeof item.trackId !== "string" || !Number.isFinite(message.serverTime) || message.serverTime - item.createdAt > REACTION_TTL_MS || message.serverTime < item.createdAt) return;
             if (Date.now() + serverOffsetRef.current - item.createdAt > REACTION_TTL_MS) return;
@@ -150,14 +158,22 @@ export function useListeningRoom(roomId: string) {
             leavingRef.current = true; clearTimers(); clearReactions(); socket.close(); setConnection("error"); setError("歌单已更新，请刷新页面后重新进入同频。"); return;
           }
           if (snapshotRef.current && message.room.revision < snapshotRef.current.revision) return;
+          lastMessageRef.current = Date.now();
           if (message.type === "welcome") {
             if (message.role !== "host" && message.role !== "guest") return;
+            if (timerRef.current) clearTimeout(timerRef.current);
+            timerRef.current = null; synchronizedRef.current = true;
             setRole(message.role); attemptsRef.current = 0; bestRttRef.current = Infinity;
             roleRef.current = message.role;
             setOffset(message.serverTime - Date.now());
             serverOffsetRef.current = message.serverTime - Date.now();
             setError(null); setConnection("connected");
             socket.send(JSON.stringify({ type: "ping", sentAt: Date.now() }));
+          }
+          if (resumePingRef.current !== null && message.sentAt === resumePingRef.current) {
+            resumePingRef.current = null; synchronizedRef.current = true;
+            if (timerRef.current) clearTimeout(timerRef.current);
+            timerRef.current = null; setConnection("connected"); setError(null);
           }
           if (Number.isFinite(message.sentAt)) {
             const receivedAt = Date.now();
@@ -176,8 +192,10 @@ export function useListeningRoom(roomId: string) {
         socket.onclose = event => {
           if (generation !== generationRef.current || leavingRef.current) return;
           clearTimers();
+          synchronizedRef.current = false;
           clearReactions();
           if ([4001, 4003, 4004, 4005].includes(event.code)) {
+            leavingRef.current = true;
             setConnection(event.code === 4004 ? "closed" : "error");
             setError(errors[event.reason] ?? "无法加入同频，请返回附近发现重新邀请。");
             return;
@@ -186,7 +204,39 @@ export function useListeningRoom(roomId: string) {
         };
       } catch { retry(); }
     })();
-  }, [roomId, clearTimers, clearReactions, settleReaction]);
+  }, [roomId, clearTimers, clearReactions, settleReaction, isSynchronized]);
+
+  useEffect(() => {
+    const offline = () => {
+      if (!credentialsRef.current || leavingRef.current) return;
+      synchronizedRef.current = false; generationRef.current++;
+      clearTimers(); clearReactions(); socketRef.current?.close();
+      setConnection("reconnecting"); setError("网络已断开，恢复后重新确认播放状态。");
+    };
+    const resume = () => {
+      if (document.visibilityState === "hidden" || !navigator.onLine || !credentialsRef.current || leavingRef.current) return;
+      synchronizedRef.current = false;
+      if (socketRef.current?.readyState !== WebSocket.OPEN || Date.now() - lastMessageRef.current >= 12_000) {
+        attemptsRef.current = 0; clearReactions(); connect(); return;
+      }
+      // Only this ping's response may release audio; older queued states cannot.
+      const sentAt = Date.now(); resumePingRef.current = sentAt;
+      bestRttRef.current = Infinity; setConnection("reconnecting");
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(connect, 8000);
+      socketRef.current.send(JSON.stringify({ type: "ping", sentAt }));
+    };
+    window.addEventListener("offline", offline);
+    window.addEventListener("online", resume);
+    window.addEventListener("pageshow", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", resume);
+      window.removeEventListener("pageshow", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [clearTimers, clearReactions, connect]);
 
   const join = useCallback(() => {
     const fragment = new URLSearchParams(window.location.hash.slice(1));
@@ -206,12 +256,13 @@ export function useListeningRoom(roomId: string) {
   }, [connect, roomId, session]);
 
   const command = useCallback((action: RoomCommand["action"], values: { position?: number; trackId?: string } = {}) => {
+    if (!isSynchronized()) return;
     const socket = socketRef.current;
     const current = snapshotRef.current;
     if (socket?.readyState !== WebSocket.OPEN || !current || current.closed) return;
     setError(null);
     socket.send(JSON.stringify({ type: "command", id: crypto.randomUUID(), revision: current.revision, action, ...values }));
-  }, []);
+  }, [isSynchronized]);
   const leave = useCallback(() => {
     leavingRef.current = true; clearTimers(); clearReactions();
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ type: "leave" }));
@@ -225,26 +276,28 @@ export function useListeningRoom(roomId: string) {
   useEffect(() => disconnect, [disconnect]);
 
   const sendReaction = useCallback((kind: ReactionKind) => {
+    if (!isSynchronized()) return;
     const socket = socketRef.current, current = snapshotRef.current;
     if (socket?.readyState !== WebSocket.OPEN || !current?.hostConnected || !current.guestConnected || current.closed || Date.now() - lastReactionSent.current < REACTION_COOLDOWN_MS || ["sending", "sent"].includes(outgoingRef.current?.status ?? "")) return;
     const delivery: ReactionDelivery = { id: crypto.randomUUID(), kind, status: "sending" };
     outgoingRef.current = delivery; setOutgoingReaction(delivery); lastReactionSent.current = Date.now();
     reactionDeadline.current = setTimeout(() => settleReaction("failed", "DELIVERY_UNCONFIRMED"), REACTION_TTL_MS);
     socket.send(JSON.stringify({ type: "reaction", id: delivery.id, kind, trackId: current.playback.trackId, sentAt: Date.now() + offset }));
-  }, [offset, settleReaction]);
+  }, [offset, settleReaction, isSynchronized]);
 
   const transmitExchange = useCallback((command: ExchangeCommand) => {
+    if (!isSynchronized()) return;
     if (socketRef.current?.readyState !== WebSocket.OPEN || snapshotRef.current?.closed) return;
     exchangeCommandRef.current = command; setExchangeRequest("sending"); setExchangeError(null);
     if (exchangeTimer.current) clearTimeout(exchangeTimer.current);
     exchangeTimer.current = setTimeout(() => { setExchangeRequest("uncertain"); setExchangeError("暂未确认操作结果，请重试确认；不会重复送出。"); }, 8000);
     socketRef.current.send(JSON.stringify(command));
-  }, []);
+  }, [isSynchronized]);
   const sendExchange = useCallback((action: ExchangeCommand["action"], values: { exchangeId?: string; trackId?: string } = {}) => {
     if (exchangeCommandRef.current) return;
     transmitExchange({ type: "exchange", id: crypto.randomUUID(), action, sentAt: Date.now() + serverOffsetRef.current, ...values });
   }, [transmitExchange]);
   const retryExchange = useCallback(() => { if (exchangeCommandRef.current) transmitExchange(exchangeCommandRef.current); }, [transmitExchange]);
 
-  return { connection, room, role, error, offset, join, command, leave, outgoingReaction, incomingReaction, sendReaction, exchangeRequest, exchangeError, sendExchange, retryExchange };
+  return { connection, room, role, error, offset, join, command, leave, outgoingReaction, incomingReaction, sendReaction, exchangeRequest, exchangeError, sendExchange, retryExchange, isSynchronized };
 }

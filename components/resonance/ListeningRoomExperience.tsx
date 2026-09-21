@@ -15,12 +15,15 @@ import { useHost } from "./HostProvider";
 import { HostStatus, MockHostPanel } from "./HostStatus";
 import { ReactionDock } from "./ReactionDock";
 import { RoomExchangePanel } from "./RoomExchangePanel";
+import { Toaster } from "@/components/ui/sonner";
+import { useRoomExchangeNotification } from "@/hooks/useOnlineNotifications";
+import { AppearanceToggle, MusicAtmosphere } from "./Appearance";
 
-const connectionLabels = { idle: "等待加入", connecting: "正在连接", connected: "已连接", reconnecting: "连接中断，正在重连", error: "连接未完成", closed: "本次同频已结束" };
+const connectionLabels = { idle: "等待加入", connecting: "正在连接", connected: "已连接", reconnecting: "正在恢复并同步状态", error: "连接未完成", closed: "本次同频已结束" };
 
 export function ListeningRoomExperience({ roomId }: { roomId: string }) {
   const host = useHost();
-  if (host.status !== "ready" || !host.session) return <main className="room-page"><section className="room-panel"><HostStatus /><Link className="room-secondary" href="/nearby?mode=online">返回附近</Link><MockHostPanel /></section></main>;
+  if (host.status !== "ready" || !host.session) return <main className="room-page music-room"><MusicAtmosphere /><section className="room-panel"><header className="room-header"><Link href="/nearby">返回附近</Link><AppearanceToggle /></header><HostStatus /><MockHostPanel /></section></main>;
   return <ConnectedRoom key={host.session.token} roomId={roomId} />;
 }
 
@@ -32,11 +35,12 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
   const roomConnection = useListeningRoom(roomId);
   const { room, role, connection, error } = roomConnection;
   const { audioRef, player } = useResonancePlayer();
-  const { needsGesture, enableAudio } = useRoomAudio(room, connection, roomConnection.offset, player);
+  const { needsGesture, enableAudio } = useRoomAudio(room, connection, roomConnection.offset, player, roomConnection.isSynchronized);
   const [draftPosition, setDraftPosition] = useState<number | null>(null);
   const draftRef = useRef<number | null>(null);
   const selectedTrack = audioTracks.find(track => track.id === room?.playback.trackId);
   const connected = connection === "connected" && !room?.closed;
+  useRoomExchangeNotification(room, role, connected);
   const canControl = connected && role === "host";
   const count = connected ? Number(room?.hostConnected ?? false) + Number(room?.guestConnected ?? false) : 0;
   const isBusy = connection === "connecting" || connection === "reconnecting";
@@ -56,8 +60,8 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
     roomConnection.leave(); player.stop(); router.push("/nearby?mode=online");
   }
 
-  return <main className="room-page" data-audio-status={player.status} data-audio-duration={player.duration} data-audio-track={player.track?.id}><audio ref={audioRef} preload="auto" hidden /><section className="room-panel">
-    <header className="room-header"><button type="button" onClick={leave}><ArrowLeft size={16} aria-hidden="true" />返回附近</button><span>SESSION / {roomId.slice(0, 8).toUpperCase()}</span></header>
+  return <main className="room-page music-room" data-audio-status={player.status} data-audio-duration={player.duration} data-audio-track={player.track?.id}><MusicAtmosphere trackId={selectedTrack?.id} /><audio ref={audioRef} preload="auto" hidden /><section className="room-panel">
+    <header className="room-header"><button type="button" onClick={leave}><ArrowLeft size={16} aria-hidden="true" />返回附近</button><AppearanceToggle /></header>
     <div className="room-content">
       <div className="room-title"><div><p>LISTEN TOGETHER</p><h1>这一刻，一起听。</h1></div><span className="room-connection" data-connected={connected} role="status">{connectionLabels[connection]}</span></div>
       {room?.exchange?.status === "pending" && role && room.exchange.from !== role && <button type="button" className="integrated-invite-notice" aria-label="查看待回应交换" onClick={() => { const panel = document.getElementById("room-exchange-panel"); panel?.scrollIntoView({ block: "start" }); panel?.focus({ preventScroll: true }); }}><span role="status">TA 送来一首歌，等你回应</span><span>查看 →</span></button>}
@@ -77,8 +81,8 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
       {error && <p className="room-error" role="alert">{error}</p>}
       {host.dataError && <p className="room-error" role="alert">{host.dataError}</p>}
       {connection === "closed" && !room && <Link className="room-secondary" href="/nearby?mode=online">回到附近发现</Link>}
-      <p className="room-footnote">模拟歌单 · 本次同频最长 2 小时</p>
+      <p className="room-footnote">本次同频最长 2 小时</p>
     </div>
     <MockHostPanel />
-  </section></main>;
+  </section><Toaster position="bottom-right" containerAriaLabel="同频通知" closeButton duration={8000} visibleToasts={2} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></main>;
 }

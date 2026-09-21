@@ -6,16 +6,16 @@ import { playbackPosition, type RoomSnapshot } from "@/lib/resonance/room-protoc
 import type { ConnectionState } from "./useListeningRoom";
 import type { ResonancePlayer } from "./useResonancePlayer";
 
-export function useRoomAudio(room: RoomSnapshot | null, connection: ConnectionState, offset: number, player: ResonancePlayer) {
+export function useRoomAudio(room: RoomSnapshot | null, connection: ConnectionState, offset: number, player: ResonancePlayer, isSynchronized: () => boolean) {
   const [needsGesture, setNeedsGesture] = useState(false);
   const blocked = useRef(false);
-  const latest = useRef({ room, connection, offset, player });
+  const latest = useRef({ room, connection, offset, player, isSynchronized });
   const synchronize = useRef<(() => void) | null>(null);
   useEffect(() => {
-    latest.current = { room, connection, offset, player };
+    latest.current = { room, connection, offset, player, isSynchronized };
     // Apply pushed state promptly even when background-tab timers are throttled.
     queueMicrotask(() => synchronize.current?.());
-  }, [room, connection, offset, player]);
+  }, [room, connection, offset, player, isSynchronized]);
 
   useEffect(() => {
     let active = true, starting = false;
@@ -23,7 +23,7 @@ export function useRoomAudio(room: RoomSnapshot | null, connection: ConnectionSt
       if (!active) return;
       const current = latest.current;
       const { room: state, player: audio } = current;
-      if (current.connection !== "connected" || !state || state.closed) {
+      if (!current.isSynchronized() || current.connection !== "connected" || !state || state.closed) {
         if (audio.status === "playing" || audio.status === "loading") audio.pause();
         audio.changePlaybackRate(1);
         return;
@@ -51,12 +51,14 @@ export function useRoomAudio(room: RoomSnapshot | null, connection: ConnectionSt
     const frame = requestAnimationFrame(sync);
     const timer = window.setInterval(sync, 250);
     document.addEventListener("visibilitychange", sync);
-    return () => { active = false; synchronize.current = null; cancelAnimationFrame(frame); window.clearInterval(timer); document.removeEventListener("visibilitychange", sync); };
+    window.addEventListener("offline", sync);
+    window.addEventListener("pageshow", sync);
+    return () => { active = false; synchronize.current = null; cancelAnimationFrame(frame); window.clearInterval(timer); document.removeEventListener("visibilitychange", sync); window.removeEventListener("offline", sync); window.removeEventListener("pageshow", sync); };
   }, []);
 
   const enableAudio = useCallback(async () => {
     const current = latest.current;
-    if (!current.room || current.connection !== "connected") return;
+    if (!current.isSynchronized() || !current.room || current.connection !== "connected") return;
     const track = audioTracks.find(item => item.id === current.room!.playback.trackId);
     if (!track) return;
     blocked.current = false; setNeedsGesture(false);

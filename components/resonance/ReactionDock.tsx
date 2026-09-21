@@ -14,10 +14,9 @@ const errors: Record<string, string> = {
 
 type Props = { mode: "demo" | "online"; disabled?: boolean; disabledHint?: string; outgoing?: ReactionDelivery | null; incoming?: RoomReaction | null; onSend: (kind: ReactionKind) => void };
 export function ReactionDock({ mode, disabled = false, disabledHint = "等双方在线，再回应这首歌", outgoing, incoming, onSend }: Props) {
-  const [local, setLocal] = useState<ReactionDelivery | null>(null);
   const [cooldown, setCooldown] = useState(false);
   const [quiet, setQuiet] = useState(false);
-  const current = mode === "demo" ? local : outgoing;
+  const current = outgoing;
   const busy = current?.status === "sending" || current?.status === "sent";
   useEffect(() => {
     if (!cooldown) return;
@@ -27,17 +26,16 @@ export function ReactionDock({ mode, disabled = false, disabledHint = "等双方
   function send(kind: ReactionKind) {
     if (disabled || busy || cooldown) return;
     setCooldown(true);
-    if (mode === "demo") setLocal({ id: crypto.randomUUID(), kind, status: "received" });
     onSend(kind);
   }
-  const caption = mode === "demo" ? current ? "本地演示 · 没有发送给在线用户" : "本地互动演示" :
+  const caption = mode === "demo" ? current?.status === "failed" ? "暂未确认送出，请重试。" : current?.status === "sending" ? "正在送出…" : busy ? "已送出，等 TA 回应。可以先去逛逛" : current?.status === "received" ? current.kind === "wave" ? "TA 也向你挥了挥手" : "TA 也喜欢这首歌" : "用一个小回应，接住这首歌" :
     disabled ? disabledHint : current?.status === "failed" ? errors[current.error ?? ""] ?? "发送未完成，请重试。" :
     current?.status === "sending" ? "正在发送…" : current?.status === "sent" ? "已发出，等待对方客户端确认…" : current?.status === "received" ? "已送达对方" : "用一个小回应，接住这首歌";
   const delivered = current?.status === "received" ? current : null;
   const incomingTrack = audioTracks.find(track => track.id === incoming?.trackId)?.track;
-  return <section className="reaction-dock" data-quiet={quiet} aria-label={mode === "demo" ? "本地互动演示" : "双人音乐回应"}>
-    <div className="reaction-dock-heading"><span>小小回应 <small>{mode === "demo" ? "DEMO" : "TOGETHER"}</small></span><button type="button" aria-pressed={quiet} onClick={() => setQuiet(value => !value)}>{quiet ? "开启动效" : "静态效果"}</button></div>
-    <div className="reaction-signal" aria-hidden="true"><span className="reaction-endpoint">YOU</span><span className="reaction-rail" /><span className="reaction-endpoint">{mode === "demo" ? "DEMO" : "TA"}</span>
+  return <section className="reaction-dock" data-quiet={quiet} aria-label="音乐回应">
+    <div className="reaction-dock-heading"><span>小小回应</span><button type="button" aria-pressed={quiet} onClick={() => setQuiet(value => !value)}>{quiet ? "开启动效" : "静态效果"}</button></div>
+    <div className="reaction-signal" aria-hidden="true"><span className="reaction-endpoint">YOU</span><span className="reaction-rail" /><span className="reaction-endpoint">TA</span>
       <span className="reaction-star reaction-star--one" /><span className="reaction-star reaction-star--two" />
       {!delivered && !incoming && <span className="reaction-idle-note" />}
       {delivered && <span key={delivered.id} className="reaction-flight" data-kind={delivered.kind} data-direction="outgoing" data-obscured={!!incoming}><InteractionGlyph kind={delivered.kind} /><span className="reaction-spark" /><span className="reaction-spark reaction-spark--two" /></span>}
