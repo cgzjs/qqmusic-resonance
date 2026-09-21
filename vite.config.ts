@@ -14,8 +14,10 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
 
 const localBindingConfig = {
-  main: "vinext/server/fetch-handler",
+  main: "./server/worker.ts",
   compatibility_flags: ["nodejs_compat"],
+  durable_objects: { bindings: [{ name: "ROOMS", class_name: "ListeningRoom" }, { name: "NEARBY", class_name: "NearbyArea" }, { name: "ACCOUNTS", class_name: "PluginAccount" }] },
+  migrations: [{ tag: "v1-listening-rooms", new_sqlite_classes: ["ListeningRoom"] }, { tag: "v2-nearby-area", new_sqlite_classes: ["NearbyArea"] }, { tag: "v3-plugin-account", new_sqlite_classes: ["PluginAccount"] }],
   d1_databases: d1
     ? [
         {
@@ -35,7 +37,7 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command }) => {
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
   process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= "false";
   process.env.WRANGLER_SEND_METRICS ??= "false";
@@ -61,7 +63,7 @@ export default defineConfig(async () => {
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
-        config: localBindingConfig,
+        config: { ...localBindingConfig, vars: { DEMO_HOST_ENABLED: command === "serve" ? "true" : "false" } },
       }),
     ],
   };

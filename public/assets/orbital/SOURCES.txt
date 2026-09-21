@@ -1,0 +1,19 @@
+Solar artwork by 480 Design, via Iconify
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+Collection: https://icon-sets.iconify.design/solar/
+Author: https://www.figma.com/@480design
+
+ufo.svg
+https://icon-sets.iconify.design/solar/ufo-2-bold-duotone/
+
+music-notes.svg
+https://icon-sets.iconify.design/solar/music-notes-bold-duotone/
+
+stars.svg
+https://icon-sets.iconify.design/solar/stars-bold-duotone/
+
+Downloaded through https://api.iconify.design/ on 2026-09-20.
+Changes: cyan display color (#6feee1); original path geometry retained.
+CSS sizing, opacity, glow, and animation added by this project.
+All files are served locally; no external asset request is made at runtime.

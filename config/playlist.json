@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "tracks": [
+    {
+      "id": "yorushika-miyakoochi",
+      "title": "都落ち",
+      "artist": "ヨルシカ",
+      "audio": "/audio/yorushika-miyakoochi.mp3",
+      "accent": "#6feee1",
+      "source": "自备模拟歌单",
+      "cover": "/covers/yorushika-gentou.jpg"
+    },
+    {
+      "id": "yorushika-matasaburo",
+      "title": "又三郎",
+      "artist": "ヨルシカ",
+      "audio": "/audio/yorushika-matasaburo.mp3",
+      "accent": "#a8bdd8",
+      "source": "自备模拟歌单",
+      "cover": "/covers/yorushika-matasaburo.jpg"
+    },
+    {
+      "id": "yorushika-roujin-to-umi",
+      "title": "老人と海",
+      "artist": "ヨルシカ",
+      "audio": "/audio/yorushika-roujin-to-umi.mp3",
+      "accent": "#d6b98c",
+      "source": "自备模拟歌单",
+      "cover": "/covers/yorushika-roujin-to-umi.jpg"
+    },
+    {
+      "id": "sana-kotoba-no-iranai-yakusoku",
+      "title": "言葉のいらない約束",
+      "artist": "鎖那",
+      "audio": "/audio/sana-kotoba-no-iranai-yakusoku.ogg",
+      "accent": "#c8b3db",
+      "source": "自备模拟歌单",
+      "cover": "/covers/naruto-the-best.jpg"
+    }
+  ]
+}

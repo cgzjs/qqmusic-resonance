@@ -6,12 +6,14 @@ import { Headphones, Music2 } from "lucide-react";
 import type { NearbyListener } from "@/lib/resonance/types";
 
 type MusicRadarProps = {
+  showCenter?: boolean;
+  showSimilarity?: boolean;
   listeners: NearbyListener[];
   selectedId: string;
   onSelect: (listener: NearbyListener) => void;
 };
 
-export function MusicRadar({ listeners, selectedId, onSelect }: MusicRadarProps) {
+export function MusicRadar({ listeners, selectedId, onSelect, showSimilarity = true, showCenter = true }: MusicRadarProps) {
   return (
     <section className="radar-shell" aria-label="附近音乐雷达">
       <div className="radar-grid" aria-hidden="true">
@@ -22,11 +24,11 @@ export function MusicRadar({ listeners, selectedId, onSelect }: MusicRadarProps)
         <i />
       </div>
 
-      <div className="radar-center" aria-label="你的位置">
+      {showCenter && <div className="radar-center" aria-label="你的音乐">
         <div className="radar-center__glow" />
         <Headphones aria-hidden="true" size={19} strokeWidth={2.2} />
         <span>YOU</span>
-      </div>
+      </div>}
 
       {listeners.map((listener, index) => {
         const isSelected = listener.id === selectedId;
@@ -44,12 +46,12 @@ export function MusicRadar({ listeners, selectedId, onSelect }: MusicRadarProps)
                 "--float-delay": `${index * -0.7}s`,
               } as CSSProperties
             }
-            aria-label={`${listener.track}，同频度 ${listener.similarity}%`}
+            aria-label={showSimilarity ? `${listener.track}，同频度 ${listener.similarity}%` : `查看在线歌曲 ${listener.track}`}
             aria-pressed={isSelected}
             onClick={() => onSelect(listener)}
           >
             <Music2 aria-hidden="true" size={14} />
-            <span>{listener.similarity}%</span>
+            <span>{showSimilarity ? `${listener.similarity}%` : "在线"}</span>
           </button>
         );
       })}

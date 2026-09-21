@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "catalogVersion": "f406c82077e14fab",
+  "tracks": [
+    {
+      "id": "yorushika-miyakoochi",
+      "track": "都落ち",
+      "artist": "ヨルシカ",
+      "audioUrl": "/audio/yorushika-miyakoochi.mp3?v=510a8d6cc9950000",
+      "coverUrl": "/covers/yorushika-gentou.jpg?v=76904df30284b195",
+      "accent": "#6feee1",
+      "source": "自备模拟歌单",
+      "duration": 250.17469387755102,
+      "mimeType": "audio/mpeg",
+      "byteLength": 10008076,
+      "revision": "510a8d6cc9950000",
+      "available": true
+    },
+    {
+      "id": "yorushika-matasaburo",
+      "track": "又三郎",
+      "artist": "ヨルシカ",
+      "audioUrl": "/audio/yorushika-matasaburo.mp3?v=d4cfc3434c9c06da",
+      "coverUrl": "/covers/yorushika-matasaburo.jpg?v=db1eb6257ef6bac6",
+      "accent": "#a8bdd8",
+      "source": "自备模拟歌单",
+      "duration": 229.35510204081632,
+      "mimeType": "audio/mpeg",
+      "byteLength": 9175293,
+      "revision": "d4cfc3434c9c06da",
+      "available": true
+    },
+    {
+      "id": "yorushika-roujin-to-umi",
+      "track": "老人と海",
+      "artist": "ヨルシカ",
+      "audioUrl": "/audio/yorushika-roujin-to-umi.mp3?v=8187d4c7c2970609",
+      "coverUrl": "/covers/yorushika-roujin-to-umi.jpg?v=61d04adc2c91ec20",
+      "accent": "#d6b98c",
+      "source": "自备模拟歌单",
+      "duration": 255.3208163265306,
+      "mimeType": "audio/mpeg",
+      "byteLength": 10213921,
+      "revision": "8187d4c7c2970609",
+      "available": true
+    },
+    {
+      "id": "sana-kotoba-no-iranai-yakusoku",
+      "track": "言葉のいらない約束",
+      "artist": "鎖那",
+      "audioUrl": "/audio/sana-kotoba-no-iranai-yakusoku.ogg?v=e4318236e58b17ea",
+      "coverUrl": "/covers/naruto-the-best.jpg?v=493035a3bc7849c8",
+      "accent": "#c8b3db",
+      "source": "自备模拟歌单",
+      "duration": 253.92,
+      "mimeType": "audio/ogg",
+      "byteLength": 2913844,
+      "revision": "e4318236e58b17ea",
+      "available": true
+    }
+  ],
+  "retired": [
+    {
+      "id": "demo-night",
+      "track": "夜行信号",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/night-signal.wav?v=119e2b639861e8a6",
+      "accent": "#6feee1",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "119e2b639861e8a6",
+      "available": false
+    },
+    {
+      "id": "demo-glass",
+      "track": "玻璃站台",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/glass-platform.wav?v=40659f76be4bdbd1",
+      "accent": "#a8bdd8",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "40659f76be4bdbd1",
+      "available": false
+    },
+    {
+      "id": "demo-breeze",
+      "track": "晚风慢拍",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/evening-breeze.wav?v=980cf8261ffe7146",
+      "accent": "#d6b98c",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "980cf8261ffe7146",
+      "available": false
+    },
+    {
+      "id": "demo-dawn",
+      "track": "清晨回声",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/dawn-echo.wav?v=1160373fa3367eea",
+      "accent": "#c8b3db",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "1160373fa3367eea",
+      "available": false
+    }
+  ]
+}

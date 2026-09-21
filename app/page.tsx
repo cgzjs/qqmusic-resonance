@@ -1,5 +1,5 @@
-import { ResonanceExperience } from "@/components/resonance/ResonanceExperience";
+import { ResonanceLanding } from "@/components/resonance/ResonanceLanding";
 
 export default function Home() {
-  return <ResonanceExperience />;
+  return <ResonanceLanding />;
 }

@@ -1,10 +1,28 @@
-import type { NearbyListener, SceneId } from "./types";
+import catalog from "./catalog.generated.json" with { type: "json" };
+import type { AudioTrack, NearbyListener, SceneId } from "./types";
+
+// Fixed illustrative waveform, not decoded audio or live playback measurements.
+export const coverWaveformPeaks = [
+  12, 18, 10, 25, 34, 29, 48, 63, 42, 70, 52, 39, 56, 31, 22, 36,
+  17, 26, 13, 19, 33, 47, 41, 59, 78, 66, 89, 62, 74, 50, 39, 56,
+  32, 23, 38, 16, 11, 19, 29, 23, 44, 58, 37, 69, 83, 62, 49, 72,
+  54, 41, 30, 45, 25, 18, 28, 13, 22, 36, 51, 39, 63, 47, 33, 55,
+  41, 28, 34, 21, 30, 17, 12, 8,
+];
 
 export const sceneLabels: Record<SceneId, string> = {
   metro: "地铁 2 号线",
   campus: "五角场校区",
   cafe: "街角咖啡店",
 };
+
+export const sceneDistanceLabels: Record<SceneId, string> = {
+  metro: "车站附近",
+  campus: "校园附近",
+  cafe: "街区附近",
+};
+
+export const audioTracks: AudioTrack[] = catalog.tracks;
 
 export const nearbyListeners: NearbyListener[] = [
   {
@@ -72,3 +90,26 @@ export const nearbyListeners: NearbyListener[] = [
     accent: "#e9d4ff",
   },
 ];
+
+// Experience audio metadata matches the locally generated recordings.
+// The cover's original concept examples above remain visual-only.
+const builtInListeners: Record<string, string> = { "demo-night": "listener-01", "demo-glass": "listener-02", "demo-breeze": "listener-03", "demo-dawn": "listener-04" };
+export const playableListeners: NearbyListener[] = audioTracks.map((track, index) => {
+  const template = nearbyListeners[index % nearbyListeners.length];
+  return {
+    ...template, id: builtInListeners[track.id] ?? `listener-${track.id}`,
+    track: track.track, artist: track.artist, accent: track.accent, coverUrl: track.coverUrl,
+    audioTrackId: track.id, sharedArtists: [track.artist],
+    suggestions: audioTracks.filter(item => item.id !== track.id).map(item => ({
+      id: item.id, track: item.track, artist: item.artist, accent: item.accent, coverUrl: item.coverUrl,
+      reason: "来自当前歌单",
+    })),
+  };
+});
+const sceneIds = (parity: number) => {
+  const ids = playableListeners.filter((_, index) => index % 2 === parity).map(listener => listener.id);
+  return ids.length ? ids : playableListeners.slice(0, 1).map(listener => listener.id);
+};
+export const sceneListenerIds: Record<SceneId, string[]> = {
+  metro: playableListeners.map(listener => listener.id), campus: sceneIds(1), cafe: sceneIds(0),
+};
