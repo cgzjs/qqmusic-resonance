@@ -21,14 +21,14 @@ export function MatchDetail({ listener, onBack, onListen, onExchange }: MatchDet
         <div className="match-orbit" aria-hidden="true">
           <span />
           <span />
-          <AlbumTile accent={listener.accent} size="lg" />
+          <AlbumTile coverUrl={listener.coverUrl} accent={listener.accent} size="lg" />
         </div>
         <div className="similarity-badge">
           <strong>{listener.similarity}%</strong>
           <span>音乐同频</span>
         </div>
         <h3>{listener.track}</h3>
-        <p>{listener.artist} · TA 正在听</p>
+        <p>{listener.artist} · 模拟听众</p>
       </div>
 
       <div className="insight-card">
@@ -39,7 +39,7 @@ export function MatchDetail({ listener, onBack, onListen, onExchange }: MatchDet
         <div className="tag-row">
           {listener.genres.map((genre) => <span key={genre}>{genre}</span>)}
         </div>
-        <p>共同喜欢 {listener.sharedArtists.join("、")}，最近的夜间听歌节奏也很接近。</p>
+        <p>这组演示听众偏好 {listener.genres.join("、")}。同频度用于展示匹配效果。</p>
       </div>
 
       <div className="privacy-line">
@@ -49,12 +49,13 @@ export function MatchDetail({ listener, onBack, onListen, onExchange }: MatchDet
 
       <div className="screen-actions">
         <Button className="primary-action" onClick={onListen}>
-          <Headphones aria-hidden="true" /> 从同一秒开始听
+          <Headphones aria-hidden="true" /> 试听这首歌
         </Button>
-        <Button variant="outline" className="secondary-action" onClick={onExchange}>
+        <Button disabled={!listener.suggestions.length} variant="outline" className="secondary-action" onClick={onExchange}>
           <Send aria-hidden="true" /> 丢一首歌给 TA
         </Button>
       </div>
+      {!listener.suggestions.length && <p className="demo-notice">歌单至少需要两首歌才能交换。</p>}
     </section>
   );
 }

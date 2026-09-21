@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "tracks": [
+    { "id": "demo-night", "title": "夜行信号", "artist": "同频声音实验", "audio": "/audio/night-signal.wav", "accent": "#6feee1", "source": "内置原创合成试听" },
+    { "id": "demo-glass", "title": "玻璃站台", "artist": "同频声音实验", "audio": "/audio/glass-platform.wav", "accent": "#a8bdd8", "source": "内置原创合成试听" },
+    { "id": "demo-breeze", "title": "晚风慢拍", "artist": "同频声音实验", "audio": "/audio/evening-breeze.wav", "accent": "#d6b98c", "source": "内置原创合成试听" },
+    { "id": "demo-dawn", "title": "清晨回声", "artist": "同频声音实验", "audio": "/audio/dawn-echo.wav", "accent": "#c8b3db", "source": "内置原创合成试听" }
+  ]
+}

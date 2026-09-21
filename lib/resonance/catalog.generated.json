@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "catalogVersion": "7c6c551cfbf12635",
+  "tracks": [
+    {
+      "id": "demo-night",
+      "track": "夜行信号",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/night-signal.wav?v=119e2b639861e8a6",
+      "accent": "#6feee1",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "119e2b639861e8a6",
+      "available": true
+    },
+    {
+      "id": "demo-glass",
+      "track": "玻璃站台",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/glass-platform.wav?v=40659f76be4bdbd1",
+      "accent": "#a8bdd8",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "40659f76be4bdbd1",
+      "available": true
+    },
+    {
+      "id": "demo-breeze",
+      "track": "晚风慢拍",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/evening-breeze.wav?v=980cf8261ffe7146",
+      "accent": "#d6b98c",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "980cf8261ffe7146",
+      "available": true
+    },
+    {
+      "id": "demo-dawn",
+      "track": "清晨回声",
+      "artist": "同频声音实验",
+      "audioUrl": "/audio/dawn-echo.wav?v=1160373fa3367eea",
+      "accent": "#c8b3db",
+      "source": "内置原创合成试听",
+      "duration": 24,
+      "mimeType": "audio/wav",
+      "byteLength": 1058444,
+      "revision": "1160373fa3367eea",
+      "available": true
+    }
+  ],
+  "retired": []
+}

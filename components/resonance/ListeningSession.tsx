@@ -1,87 +1,55 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
-import { Heart, Pause, Send, Hand } from "lucide-react";
-
+import { Heart, Pause, Play, Send, Volume2, RotateCcw } from "lucide-react";
+import { ReactionDock } from "./ReactionDock";
+import { audioTracks } from "@/lib/resonance/demo-data";
 import { AlbumTile } from "@/components/resonance/AlbumTile";
 import { ViewHeader } from "@/components/resonance/ViewHeader";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import type { NearbyListener } from "@/lib/resonance/types";
+import { formatTime } from "@/lib/resonance/library";
+import type { ResonancePlayer } from "@/hooks/useResonancePlayer";
 
 type ListeningSessionProps = {
-  listener: NearbyListener;
+  onOpenOnline: () => void;
+  player: ResonancePlayer;
+  reaction: "wave" | "heart" | null;
+  isFavorite: boolean;
+  onReact: (reaction: "wave" | "heart") => void;
+  onToggleFavorite: () => void;
   onBack: () => void;
   onExchange: () => void;
+  onEnd: () => void;
 };
 
-export function ListeningSession({ listener, onBack, onExchange }: ListeningSessionProps) {
-  const [progress, setProgress] = useState(38);
-  const [reaction, setReaction] = useState<"wave" | "heart" | null>(null);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setProgress((current) => (current >= 92 ? 38 : current + 0.25));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
+export function ListeningSession({ player, isFavorite, onReact, onToggleFavorite, onBack, onExchange, onEnd, onOpenOnline }: ListeningSessionProps) {
+  const { track, status } = player;
+  if (!track) return null;
+  const isPlaying = status === "playing" || status === "loading";
+  const statusLabel = { idle: "准备试听", loading: "正在加载音频", playing: "正在试听", paused: "已暂停", ended: "试听结束", error: "播放遇到问题" }[status];
   return (
-    <section className="screen-view listening-view">
-      <ViewHeader eyebrow="同步跟听中" title="此刻，2 人在线" onBack={onBack} />
-
+    <section className="screen-view listening-view" data-playing={status === "playing"}>
+      <ViewHeader eyebrow="单人跟听演示" title={statusLabel} onBack={onBack} />
       <div className="listening-art">
-        <div className="sound-wave" aria-hidden="true">
-          {Array.from({ length: 18 }, (_, index) => <i key={index} style={{ "--bar": index } as CSSProperties} />)}
-        </div>
-        <AlbumTile accent={listener.accent} size="lg" />
-        <div className="listener-pips" aria-label="两位听众在线">
-          <span>你</span>
-          <i />
-          <span>TA</span>
-        </div>
+        <AlbumTile coverUrl={track.coverUrl} accent={track.accent} size="lg" />
       </div>
-
-      <div className="now-playing">
-        <p>NOW PLAYING TOGETHER</p>
-        <h3>{listener.track}</h3>
-        <span>{listener.artist}</span>
-      </div>
-
+      <div className="now-playing"><p>NOW PLAYING</p><h3>{track.track}</h3><span>{track.artist}</span></div>
+      <p className="audio-source">{track.source}</p>
       <div className="player-progress">
-        <Progress value={progress} aria-label="播放进度" />
-        <div><span>06:31</span><span>17:07</span></div>
+        <input className="audio-range" type="range" aria-label="播放进度" aria-valuetext={`${formatTime(player.currentTime)} / ${formatTime(player.duration)}`} min={0} max={player.duration || 1} step={.1} value={Math.min(player.currentTime, player.duration || 0)} disabled={!player.duration || status === "error"} onChange={event => player.seek(Number(event.target.value))} />
+        <div><span>{formatTime(player.currentTime)}</span><span>{formatTime(player.duration)}</span></div>
       </div>
-
-      <div className="reaction-row">
-        <Button
-          variant="outline"
-          className={reaction === "wave" ? "reaction-button is-active" : "reaction-button"}
-          onClick={() => setReaction("wave")}
-        >
-          <Hand aria-hidden="true" /> 打个招呼
-        </Button>
-        <Button
-          variant="outline"
-          className={reaction === "heart" ? "reaction-button is-active" : "reaction-button"}
-          onClick={() => setReaction("heart")}
-        >
-          <Heart aria-hidden="true" /> 这首不错
-        </Button>
-      </div>
-
-      <div className="session-status" aria-live="polite">
-        {reaction ? <span>已送出一个轻轻的{reaction === "wave" ? "招呼" : "喜欢"}</span> : <span>不用说话，让音乐待一会儿</span>}
-      </div>
-
+      {player.error && <div className="playback-error" role="alert"><span>{player.error}</span><button type="button" onClick={() => void player.playTrack(track)}>重试</button></div>}
       <div className="player-controls">
-        <Button variant="ghost" size="icon" className="round-control" aria-label="暂停">
-          <Pause aria-hidden="true" fill="currentColor" />
+        <Button variant="outline" className="round-control" aria-label={isPlaying ? "暂停" : status === "ended" ? "重新播放" : "播放"} onClick={player.toggle}>
+          {isPlaying ? <Pause aria-hidden="true" /> : status === "ended" ? <RotateCcw aria-hidden="true" /> : <Play aria-hidden="true" />}
         </Button>
-        <Button className="exchange-cta" onClick={onExchange}>
-          <Send aria-hidden="true" /> 交换一首
-        </Button>
+        <Button variant="outline" className="round-control" aria-label={isFavorite ? "取消收藏" : "收藏歌曲"} aria-pressed={isFavorite} onClick={onToggleFavorite}><Heart aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} /></Button>
+        <Button className="exchange-cta" disabled={audioTracks.length < 2} onClick={onExchange}><Send aria-hidden="true" />交换一首</Button>
       </div>
+      <label className="audio-volume"><Volume2 size={16} aria-hidden="true" /><span>音量</span><input className="audio-range" type="range" aria-label="音量" min={0} max={1} step={.05} value={player.volume} onChange={event => player.changeVolume(Number(event.target.value))} /></label>
+      <ReactionDock mode="demo" onSend={onReact} />
+      <Button variant="ghost" className="end-listening" onClick={onEnd}>结束试听</Button>
+      <button type="button" className="invite-listening-link" onClick={onOpenOnline}>查看在线听众，邀请同频 →</button>
     </section>
   );
 }

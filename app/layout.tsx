@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { HostProvider } from "@/components/resonance/HostProvider";
 
 export const metadata: Metadata = {
   title: "同频 · QQ音乐概念设计",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body><HostProvider>{children}</HostProvider></body>
     </html>
   );
 }

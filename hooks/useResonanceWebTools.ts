@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
-import { nearbyListeners } from "@/lib/resonance/demo-data";
+import { playableListeners as nearbyListeners } from "@/lib/resonance/demo-data";
 import type { AppView, NearbyListener } from "@/lib/resonance/types";
 
 type RegisteredTool = {
@@ -30,6 +30,8 @@ type WebToolActions = {
 };
 
 export function useResonanceWebTools({ selectListener, setView }: WebToolActions) {
+  const actions = useRef({ selectListener, setView });
+  useEffect(() => { actions.current = { selectListener, setView }; }, [selectListener, setView]);
   useEffect(() => {
     const context = document.modelContext;
     if (!context?.registerTool) return;
@@ -39,8 +41,8 @@ export function useResonanceWebTools({ selectListener, setView }: WebToolActions
     const tools: RegisteredTool[] = [
       {
         name: "open_nearby_match",
-        title: "打开附近音乐匹配",
-        description: "选择一个附近的匿名听众，并在页面中打开对应的同频详情。",
+        title: "打开场景模拟音乐匹配",
+        description: "选择一个场景演示听众，打开模拟同频详情；不会向在线用户发出邀请。",
         inputSchema: {
           type: "object",
           properties: {
@@ -57,8 +59,8 @@ export function useResonanceWebTools({ selectListener, setView }: WebToolActions
           const listenerId = (input as { listenerId?: unknown })?.listenerId;
           const listener = nearbyListeners.find((item) => item.id === listenerId);
           if (!listener) throw new Error("Unknown listenerId");
-          selectListener(listener);
-          setView("match");
+          actions.current.selectListener(listener);
+          actions.current.setView("match");
           return { listenerId: listener.id, track: listener.track, view: "match" };
         },
       },
@@ -69,7 +71,7 @@ export function useResonanceWebTools({ selectListener, setView }: WebToolActions
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         annotations: { readOnlyHint: false, untrustedContentHint: false },
         execute() {
-          setView("journey");
+          actions.current.setView("journey");
           return { view: "journey" };
         },
       },
@@ -84,5 +86,5 @@ export function useResonanceWebTools({ selectListener, setView }: WebToolActions
     }
 
     return () => lifecycle.abort();
-  }, [selectListener, setView]);
+  }, []);
 }

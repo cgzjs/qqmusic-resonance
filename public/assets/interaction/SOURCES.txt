@@ -1,0 +1,13 @@
+Solar icons by 480 Design, distributed through Iconify.
+Collection: https://icon-sets.iconify.design/solar/
+Author: https://www.figma.com/@480design
+License: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+
+wave.svg: solar:hand-stars-bold-duotone
+heart.svg: solar:heart-shine-bold-duotone
+exchange.svg: solar:music-library-2-bold-duotone
+
+Retrieved from https://api.iconify.design/solar/<icon-name>.svg on 2026-09-20.
+Changes: currentColor replaced with cyan #6feee1; original geometry retained.
+Project adds CSS sizing, hover feedback and one-shot motion. Served locally.
+Existing music notes/stars/UFO artwork uses the same collection; see ../orbital/SOURCES.txt.
