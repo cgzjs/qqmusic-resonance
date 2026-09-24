@@ -1,0 +1,23 @@
+Solar artwork by 480 Design, served locally via Iconify.
+License: CC BY 4.0 (attribution required)
+https://creativecommons.org/licenses/by/4.0/
+Author: https://www.figma.com/@480design
+Collection: https://icon-sets.iconify.design/solar/
+
+Retrieved 2026-09-24:
+music-notes-linear.svg
+https://icon-sets.iconify.design/solar/music-notes-linear/
+https://api.iconify.design/solar/music-notes-linear.svg
+
+stars-line-duotone.svg
+https://icon-sets.iconify.design/solar/stars-line-duotone/
+https://api.iconify.design/solar/stars-line-duotone.svg
+
+soundwave-line-duotone.svg
+https://icon-sets.iconify.design/solar/soundwave-line-duotone/
+https://api.iconify.design/solar/soundwave-line-duotone.svg
+
+Original SVG geometry retained. CSS masks apply theme color, size, rotation and
+opacity. Static decorative artwork is hidden from assistive technology and does
+not intercept pointer input. Playback effects are CSS ornament, not measured
+audio frequency data. No asset requests go to third-party servers at runtime.

@@ -22,7 +22,7 @@ export function useDemoReplies(onReply: (reply: DemoReply) => void) {
   }, [data.demoReplies, claimReply]);
   const latest = (data.demoReplies ?? []).filter(item => item.kind !== "exchange").at(-1);
   const reaction: ReactionDelivery | null = latest && (!sending || latest.id === sending.id) ? {
-    id: latest.id, kind: latest.kind as ReactionKind, status: latest.status === "pending" ? "sent" : "received",
+    id: latest.id, kind: latest.kind as ReactionKind, trackId: latest.trackId, status: latest.status === "pending" ? "sent" : "received",
   } : sending;
   const sendReaction = useCallback(async (kind: ReactionKind, trackId: string) => {
     if (busy.current || (data.demoReplies ?? []).some(item => item.kind !== "exchange" && item.status === "pending")) return;

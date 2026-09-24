@@ -2,7 +2,7 @@ import type { ExchangeCommand, RoomExchange } from "./exchange-protocol";
 export type RoomRole = "host" | "guest";
 export type ReactionKind = "wave" | "heart";
 export type RoomReaction = { id: string; kind: ReactionKind; from: RoomRole; trackId: string; createdAt: number };
-export type ReactionDelivery = { id: string; kind: ReactionKind; status: "sending" | "sent" | "received" | "failed"; error?: string };
+export type ReactionDelivery = { id: string; kind: ReactionKind; status: "sending" | "sent" | "received" | "failed"; trackId?: string; error?: string };
 export const REACTION_TTL_MS = 6000;
 export const REACTION_COOLDOWN_MS = 2000;
 export type RoomPlayback = { trackId: string; position: number; playing: boolean; updatedAt: number };

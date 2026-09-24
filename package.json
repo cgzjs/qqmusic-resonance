@@ -29,6 +29,8 @@
     "test:received:integration": "node --test tests/received-songs.integration.mjs",
     "test:replies:integration": "node --test tests/demo-replies.integration.mjs",
     "test:login": "node --test tests/demo-login.test.mjs",
+    "test:blocking": "node --test tests/listener-blocking.test.mjs",
+    "test:blocking:integration": "node --test tests/listener-blocking.integration.mjs",
     "test:login:integration": "node --test tests/tab-login.integration.mjs"
   },
   "dependencies": {

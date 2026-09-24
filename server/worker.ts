@@ -14,7 +14,7 @@ const worker = {
     if (url.pathname.startsWith("/api/nearby/") || url.pathname.startsWith("/api/host/")) {
       const origin = request.headers.get("Origin");
       if (origin && origin !== url.origin) return Response.json({ error: "INVALID_ORIGIN" }, { status: 403 });
-      if (!/^\/api\/(nearby\/(start|state|invite|respond|stop|track)|host\/(config|create|resume|logout|data))$/.test(url.pathname)) return new Response(null, { status: 404 });
+      if (!/^\/api\/(nearby\/(start|state|invite|respond|stop|track|blocks|block|unblock)|host\/(config|create|resume|logout|data))$/.test(url.pathname)) return new Response(null, { status: 404 });
       if (request.method === "POST") {
         if (!request.headers.get("Content-Type")?.startsWith("application/json")) return new Response(null, { status: 415 });
         const reader = request.body?.getReader();

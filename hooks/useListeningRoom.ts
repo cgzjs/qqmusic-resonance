@@ -279,7 +279,7 @@ export function useListeningRoom(roomId: string) {
     if (!isSynchronized()) return;
     const socket = socketRef.current, current = snapshotRef.current;
     if (socket?.readyState !== WebSocket.OPEN || !current?.hostConnected || !current.guestConnected || current.closed || Date.now() - lastReactionSent.current < REACTION_COOLDOWN_MS || ["sending", "sent"].includes(outgoingRef.current?.status ?? "")) return;
-    const delivery: ReactionDelivery = { id: crypto.randomUUID(), kind, status: "sending" };
+    const delivery: ReactionDelivery = { id: crypto.randomUUID(), kind, trackId: current.playback.trackId, status: "sending" };
     outgoingRef.current = delivery; setOutgoingReaction(delivery); lastReactionSent.current = Date.now();
     reactionDeadline.current = setTimeout(() => settleReaction("failed", "DELIVERY_UNCONFIRMED"), REACTION_TTL_MS);
     socket.send(JSON.stringify({ type: "reaction", id: delivery.id, kind, trackId: current.playback.trackId, sentAt: Date.now() + offset }));
