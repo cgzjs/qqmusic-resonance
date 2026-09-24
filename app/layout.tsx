@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./product.css";
 import "./appearance.css";
+import "./mobile-music.css";
 import { HostProvider } from "@/components/resonance/HostProvider";
 import { AppearanceProvider } from "@/components/resonance/Appearance";
 

@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Headphones, Link2, Pause, Play, Users, Volume2 } from "lucide-react";
+import { ArrowLeft, Headphones, Pause, Play, Users, Volume2 } from "lucide-react";
 import { audioTracks } from "@/lib/resonance/demo-data";
 import { formatTime } from "@/lib/resonance/library";
 import { useListeningRoom } from "@/hooks/useListeningRoom";
 import { useResonancePlayer } from "@/hooks/useResonancePlayer";
 import { useRoomAudio } from "@/hooks/useRoomAudio";
 import { useClientReady } from "@/hooks/useClientReady";
-import { AlbumTile } from "./AlbumTile";
+import { ListeningArtwork } from "./ListeningArtwork";
 import { useHost } from "./HostProvider";
 import { HostStatus, MockHostPanel } from "./HostStatus";
 import { ReactionDock } from "./ReactionDock";
@@ -18,6 +18,7 @@ import { RoomExchangePanel } from "./RoomExchangePanel";
 import { Toaster } from "@/components/ui/sonner";
 import { useRoomExchangeNotification } from "@/hooks/useOnlineNotifications";
 import { AppearanceToggle, MusicAtmosphere } from "./Appearance";
+import { BlockListenerButton } from "./ListenerSafety";
 
 const connectionLabels = { idle: "等待加入", connecting: "正在连接", connected: "已连接", reconnecting: "正在恢复并同步状态", error: "连接未完成", closed: "本次同频已结束" };
 
@@ -42,7 +43,7 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
   const connected = connection === "connected" && !room?.closed;
   useRoomExchangeNotification(room, role, connected);
   const canControl = connected && role === "host";
-  const count = connected ? Number(room?.hostConnected ?? false) + Number(room?.guestConnected ?? false) : 0;
+  const [quiet, setQuiet] = useState(false);
   const isBusy = connection === "connecting" || connection === "reconnecting";
   const recorded = useRef(new Set<string>());
   useEffect(() => {
@@ -67,15 +68,15 @@ function ConnectedRoom({ roomId }: { roomId: string }) {
       {room?.exchange?.status === "pending" && role && room.exchange.from !== role && <button type="button" className="integrated-invite-notice" aria-label="查看待回应交换" onClick={() => { const panel = document.getElementById("room-exchange-panel"); panel?.scrollIntoView({ block: "start" }); panel?.focus({ preventScroll: true }); }}><span role="status">TA 送来一首歌，等你回应</span><span>查看 →</span></button>}
       {!room && <div className="room-join"><Users size={38} aria-hidden="true" /><p>双方已同意，一起听这首歌。<br />分享歌曲的一方带领播放，音量各自调整。</p><button type="button" className="room-primary" disabled={!isClientReady || isBusy || connection === "closed"} onClick={roomConnection.join}><Headphones size={18} aria-hidden="true" />{isBusy ? "正在连接" : "开启声音并加入"}</button></div>}
       {room && <>
-        <div className="room-members" aria-label={connected ? `房间人数 ${count} / 2` : "等待连接恢复"}><span data-online={connected && room.hostConnected}><Headphones size={20} aria-hidden="true" /><strong>{role === "host" ? "你 · 分享音乐" : "分享音乐的人"}</strong><small>{connected && room.hostConnected ? "在线" : "未连接"}</small></span><Link2 size={19} aria-hidden="true" /><span data-online={connected && room.guestConnected}><Headphones size={20} aria-hidden="true" /><strong>{role === "guest" ? "你 · 跟听" : "同频的人"}</strong><small>{connected && room.guestConnected ? "在线" : "等待加入"}</small></span></div>
-        {selectedTrack && <div className="room-now-playing"><AlbumTile coverUrl={selectedTrack.coverUrl} accent={selectedTrack.accent} size="lg" /><h2>{selectedTrack.track}</h2><p>{selectedTrack.artist}</p></div>}
+        {selectedTrack && <div className="room-now-playing"><ListeningArtwork key={selectedTrack.id} track={selectedTrack} mode="online" role={role} outgoing={roomConnection.outgoingReaction} incoming={roomConnection.incomingReaction} selfOnline={connected && (role === "host" ? room.hostConnected : room.guestConnected)} peerOnline={connected && (role === "host" ? room.guestConnected : room.hostConnected)} quiet={quiet} /><h2>{selectedTrack.track}</h2><p>{selectedTrack.artist}</p></div>}
         <div className="room-progress" data-room-revision={room.revision} data-target-position={room.playback.position} data-room-playing={room.playback.playing}><input type="range" aria-label="房间播放进度" min={0} max={player.duration || selectedTrack?.duration || 0} step={.1} value={draftPosition ?? player.currentTime} disabled={!canControl || !player.duration} onChange={event => { draftRef.current = Number(event.target.value); setDraftPosition(draftRef.current); }} onPointerUp={commitSeek} onKeyUp={commitSeek} onBlur={commitSeek} onPointerCancel={() => { draftRef.current = null; setDraftPosition(null); }} /><div><span>{formatTime(draftPosition ?? player.currentTime)}</span><span>{formatTime(player.duration || selectedTrack?.duration || 0)}</span></div></div>
         {role === "host" ? <div className="room-controls"><button type="button" className="room-primary" disabled={!canControl} onClick={() => roomConnection.command(room.playback.playing ? "pause" : "play")}>{room.playback.playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}{room.playback.playing ? "暂停两端" : "一起播放"}</button><label><span className="sr-only">房间曲目</span><select aria-label="房间曲目" value={room.playback.trackId} disabled={!canControl} onChange={event => roomConnection.command("track", { trackId: event.target.value })}>{audioTracks.map(track => <option key={track.id} value={track.id}>{track.track}</option>)}</select></label></div> : <p className="room-follow-status">{connected ? room.playback.playing ? "正在跟随对方播放" : "等待对方开始播放" : connection === "closed" ? "本次同频已结束，本机播放已停止" : "连接恢复前已暂停本机播放"}</p>}
         <label className="room-volume"><Volume2 size={17} aria-hidden="true" /><span>本机音量</span><input type="range" aria-label="本机音量" min={0} max={1} step={.05} value={player.volume} onChange={event => player.changeVolume(Number(event.target.value))} /></label>
-        <ReactionDock mode="online" disabled={!connected || !room.hostConnected || !room.guestConnected} disabledHint={connection === "closed" ? "本次同频已结束" : !connected ? "连接恢复后再回应" : "等双方在线，再回应这首歌"} outgoing={roomConnection.outgoingReaction} incoming={roomConnection.incomingReaction} onSend={roomConnection.sendReaction} />
+        <ReactionDock mode="online" disabled={!connected || !room.hostConnected || !room.guestConnected} disabledHint={connection === "closed" ? "本次同频已结束" : !connected ? "连接恢复后再回应" : "等双方在线，再回应这首歌"} outgoing={roomConnection.outgoingReaction} incoming={roomConnection.incomingReaction} onSend={roomConnection.sendReaction} quiet={quiet} onQuietChange={setQuiet} />
         {(needsGesture || player.error) && <div className="room-audio-notice" role="status"><span>{player.error ?? "点击开启声音以跟随房间播放。"}</span><button type="button" disabled={!connected} onClick={() => void enableAudio()}>{player.error ? "重试音频" : "开启声音"}</button></div>}
         {connection === "error" && <button type="button" className="room-secondary" onClick={roomConnection.join}>重新连接</button>}
         <RoomExchangePanel key={room.exchange?.id ?? "idle"} connection={roomConnection} />
+        <BlockListenerButton target={{ roomId }} alias="这位听众" disabled={!connected} onBlocked={leave} />
         <button type="button" className="room-leave" onClick={leave}>{!connected ? "返回附近发现" : "结束同频"}</button>
       </>}
       {error && <p className="room-error" role="alert">{error}</p>}

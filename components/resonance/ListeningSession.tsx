@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Heart, Pause, Play, Send, Volume2, RotateCcw } from "lucide-react";
 import { ReactionDock } from "./ReactionDock";
 import { audioTracks } from "@/lib/resonance/demo-data";
-import { AlbumTile } from "@/components/resonance/AlbumTile";
+import { ListeningArtwork } from "./ListeningArtwork";
 import { ViewHeader } from "@/components/resonance/ViewHeader";
 import { Button } from "@/components/ui/button";
 import { formatTime } from "@/lib/resonance/library";
@@ -23,6 +24,7 @@ type ListeningSessionProps = {
 
 export function ListeningSession({ player, reaction, isFavorite, onReact, onToggleFavorite, onBack, onExchange, onEnd }: ListeningSessionProps) {
   const { track, status } = player;
+  const [quiet, setQuiet] = useState(false);
   if (!track) return null;
   const isPlaying = status === "playing" || status === "loading";
   const statusLabel = { idle: "准备试听", loading: "正在加载音频", playing: "正在试听", paused: "已暂停", ended: "试听结束", error: "播放遇到问题" }[status];
@@ -30,7 +32,7 @@ export function ListeningSession({ player, reaction, isFavorite, onReact, onTogg
     <section className="screen-view listening-view" data-playing={status === "playing"}>
       <ViewHeader eyebrow="跟听这首歌" title={statusLabel} onBack={onBack} />
       <div className="listening-art">
-        <AlbumTile coverUrl={track.coverUrl} accent={track.accent} size="lg" />
+        <ListeningArtwork key={track.id} track={track} mode="demo" outgoing={reaction} quiet={quiet} />
       </div>
       <div className="now-playing"><p>NOW PLAYING</p><h3>{track.track}</h3><span>{track.artist}</span></div>
       <div className="player-progress">
@@ -46,7 +48,7 @@ export function ListeningSession({ player, reaction, isFavorite, onReact, onTogg
         <Button className="exchange-cta" disabled={audioTracks.length < 2} onClick={onExchange}><Send aria-hidden="true" />交换一首</Button>
       </div>
       <label className="audio-volume"><Volume2 size={16} aria-hidden="true" /><span>音量</span><input className="audio-range" type="range" aria-label="音量" min={0} max={1} step={.05} value={player.volume} onChange={event => player.changeVolume(Number(event.target.value))} /></label>
-      <ReactionDock key={player.track?.id} mode="demo" outgoing={reaction} onSend={onReact} />
+      <ReactionDock key={player.track?.id} mode="demo" outgoing={reaction} onSend={onReact} quiet={quiet} onQuietChange={setQuiet} />
       <Button variant="ghost" className="end-listening" onClick={onEnd}>结束试听</Button>
     </section>
   );

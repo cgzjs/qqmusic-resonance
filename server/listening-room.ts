@@ -161,6 +161,16 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    // Internal-only route: never forwarded by the public worker router.
+    if (new URL(request.url).pathname === "/close-for-block" && request.method === "POST") {
+      return this.ctx.blockConcurrencyWhile(async () => {
+        const { host, guest } = await request.json<{ host: string; guest: string }>();
+        if (!this.room) return Response.json({ ok: true });
+        if (this.room.accounts?.host !== host || this.room.accounts?.guest !== guest) return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+        await this.closeRoom();
+        return Response.json({ ok: true });
+      });
+    }
     if (new URL(request.url).pathname === "/init" && request.method === "POST") {
       if (this.room) return Response.json({ error: "ROOM_EXISTS" }, { status: 409 });
       const { id, trackId, nearby, accounts } = await request.json<{ id: string; trackId: string; nearby?: boolean; accounts?: Record<RoomRole, string> }>();

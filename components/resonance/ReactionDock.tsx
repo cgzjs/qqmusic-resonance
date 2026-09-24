@@ -12,10 +12,12 @@ const errors: Record<string, string> = {
   CONNECTION_LOST: "连接中断，这条回应未确认送达。", DELIVERY_UNCONFIRMED: "暂未确认送达，可稍后再发。",
 };
 
-type Props = { mode: "demo" | "online"; disabled?: boolean; disabledHint?: string; outgoing?: ReactionDelivery | null; incoming?: RoomReaction | null; onSend: (kind: ReactionKind) => void };
-export function ReactionDock({ mode, disabled = false, disabledHint = "等双方在线，再回应这首歌", outgoing, incoming, onSend }: Props) {
+type Props = { mode: "demo" | "online"; disabled?: boolean; disabledHint?: string; outgoing?: ReactionDelivery | null; incoming?: RoomReaction | null; onSend: (kind: ReactionKind) => void; quiet?: boolean; onQuietChange?: (quiet: boolean) => void };
+export function ReactionDock({ mode, disabled = false, disabledHint = "等双方在线，再回应这首歌", outgoing, incoming, onSend, quiet: controlledQuiet, onQuietChange }: Props) {
   const [cooldown, setCooldown] = useState(false);
-  const [quiet, setQuiet] = useState(false);
+  const [localQuiet, setLocalQuiet] = useState(false);
+  const quiet = controlledQuiet ?? localQuiet;
+  function toggleQuiet() { setLocalQuiet(!quiet); onQuietChange?.(!quiet); }
   const current = outgoing;
   const busy = current?.status === "sending" || current?.status === "sent";
   useEffect(() => {
@@ -34,7 +36,7 @@ export function ReactionDock({ mode, disabled = false, disabledHint = "等双方
   const delivered = current?.status === "received" ? current : null;
   const incomingTrack = audioTracks.find(track => track.id === incoming?.trackId)?.track;
   return <section className="reaction-dock" data-quiet={quiet} aria-label="音乐回应">
-    <div className="reaction-dock-heading"><span>小小回应</span><button type="button" aria-pressed={quiet} onClick={() => setQuiet(value => !value)}>{quiet ? "开启动效" : "静态效果"}</button></div>
+    <div className="reaction-dock-heading"><span>小小回应</span><button type="button" aria-pressed={quiet} onClick={toggleQuiet}>{quiet ? "开启动效" : "静态效果"}</button></div>
     <div className="reaction-signal" aria-hidden="true"><span className="reaction-endpoint">YOU</span><span className="reaction-rail" /><span className="reaction-endpoint">TA</span>
       <span className="reaction-star reaction-star--one" /><span className="reaction-star reaction-star--two" />
       {!delivered && !incoming && <span className="reaction-idle-note" />}

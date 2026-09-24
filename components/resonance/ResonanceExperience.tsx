@@ -41,7 +41,7 @@ function restoreExchange(item?: DemoReply): ExchangeDraft | null {
   return { id: item!.id, listener, source: "match", scene: event.scene, selectedId: event.trackId, receivedId: event.receivedTrackId ?? null, status: item!.status === "pending" ? "sending" : "received", queuedEvent: event };
 }
 
-type ExperienceProps = { playbackHeader?: (player: ResonancePlayer) => ReactNode; onTrackChange?: (trackId: string) => void; onlinePanel: ReactNode; onlineNotice: string | null; incomingInvite?: NearbyInvite | null; onlineActive: boolean; onPauseOnline: () => void; initialSource: "demo" | "online" };
+type ExperienceProps = { playbackHeader?: (player: ResonancePlayer) => ReactNode; onTrackChange?: (trackId: string) => void; onlinePanel: ReactNode | ((player: ResonancePlayer) => ReactNode); onlineNotice: string | null; incomingInvite?: NearbyInvite | null; onlineActive: boolean; onPauseOnline: () => void; initialSource: "demo" | "online" };
 export function ResonanceExperience(props: ExperienceProps) {
   return playableListeners.length ? <PopulatedExperience {...props} /> : <EmptyPlaylistExperience />;
 }
@@ -214,7 +214,7 @@ function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlin
         {onlineActive && !(view === "radar" && radarSource === "online") && <div className="integrated-presence"><span>真人联调发现已开启</span><button type="button" onClick={onPauseOnline}>暂停在线发现</button></div>}
         {exchange && exchange.status !== "choosing" && view !== "exchange" && <button type="button" className="demo-reply-reminder" onClick={viewExchange}><InteractionGlyph kind="exchange" /><span>{exchange.status === "sending" ? "等待 TA 回歌" : "TA 回了一首歌"}</span><span>查看 →</span></button>}
         <div className="phone-stage__content" ref={contentRef}>
-          {view === "radar" && radarSource === "online" && onlinePanel}
+          {view === "radar" && radarSource === "online" && (typeof onlinePanel === "function" ? onlinePanel(player) : onlinePanel)}
           {view === "radar" && radarSource === "demo" && <RadarHome isDiscoverable={isDiscoverable} onDiscoverableChange={value => { setIsDiscoverable(value); setIsScanning(false); }} scene={scene} onSceneChange={changeScene} listeners={listeners} isScanning={isScanning} onRefresh={() => { setScanRound(round => round + 1); setIsScanning(true); }} selectedListener={selectedListener} onSelectListener={listener => setSelectedId(listener.id)} onOpenMatch={() => openMatch()} />}
           {view === "match" && <MatchDetail listener={selectedListener} onBack={() => setView("radar")} onListen={() => void startListening(selectedListener)} onExchange={() => openExchange("match")} />}
           {view === "listening" && player.track && <ListeningSession player={player} reaction={reaction} onReact={kind => { if (player.track) sendReaction(kind, player.track.id); }} isFavorite={library.favoriteIds.includes(player.track.id)} onToggleFavorite={() => player.track && dispatch({ type: library.favoriteIds.includes(player.track.id) ? "removeFavorite" : "favorite", trackId: player.track.id })} onBack={() => { setSelectedId(playbackListener.id); setView(listeningSource); }} onExchange={() => openExchange("listening")} onEnd={() => { player.stop(); setView("radar"); }} />}

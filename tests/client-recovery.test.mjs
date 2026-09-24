@@ -14,7 +14,7 @@ const folder = path.resolve("node_modules/.cache/client-recovery");
 await mkdir(folder, { recursive: true });
 const bundle = path.join(folder, `client-recovery-${process.pid}.mjs`);
 const result = await build({
-  stdin: { contents: `export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useIncomingInviteNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
+  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useIncomingInviteNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
   bundle: true, platform: "node", format: "esm", packages: "external", write: false,
   plugins: [{ name: "test-boundaries", setup(builder) {
     builder.onResolve({ filter: /^(sonner|@\/components\/ui\/sonner)$/ }, args => ({ path: args.path, namespace: "toast" }));
@@ -26,7 +26,7 @@ const result = await build({
   } }],
 });
 await writeFile(bundle, result.outputFiles[0].text);
-const { CurrentPlaybackBar, useIncomingInviteNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, audioTracks } = await import(pathToFileURL(bundle));
+const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useIncomingInviteNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, audioTracks } = await import(pathToFileURL(bundle));
 after(() => unlink(bundle));
 const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const token = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -386,4 +386,106 @@ test("radar is visible without opening a disclosure and only renders actual list
   assert.equal(document.querySelectorAll('.orbit-listener').length, 1);
   assert.equal(document.querySelector('.orbit-listener').getAttribute('aria-label'), `查看在线歌曲 ${audioTracks[1].track}`);
   assert.equal(document.querySelector('.orbit-map').getAttribute('data-active'), 'true');
+});
+
+
+test("blocking requires confirmation, leaves failed requests retryable, and reports success only after acknowledgement", async () => {
+  let completed = 0;
+  respond = async () => { throw new TypeError('offline'); };
+  await act(async () => root.render(React.createElement(BlockListenerButton, { target: { targetId: id }, alias: '听众 B', onBlocked: () => completed++ })));
+  await act(async () => document.querySelector('.listener-block-trigger').click());
+  assert.equal(calls.length, 0);
+  const confirm = () => [...document.querySelectorAll('button')].find(button => button.textContent === '确认屏蔽');
+  await act(async () => confirm().click());
+  assert.equal(completed, 0);
+  assert.match(document.querySelector('[role="alert"]').textContent, /结果尚未确认/);
+  respond = async () => response({ blocks: [{ id: token, alias: '听众 B', createdAt: Date.now() }] });
+  await act(async () => confirm().click());
+  assert.equal(completed, 1);
+  assert.match(document.querySelector('[role="status"]').textContent, /已屏蔽/);
+});
+
+test("late safety responses after account switch cannot expire the new account or update its UI", async () => {
+  let finish;
+  respond = () => new Promise(resolve => { finish = resolve; });
+  function Harness() { current = useListenerSafety(); return null; }
+  await act(async () => root.render(React.createElement(Harness)));
+  let pending;
+  await act(async () => { pending = current.run('block', { targetId: id }); });
+  recoveryTest.session = { ...recoveryTest.session, accountId: 'account-b', token: id };
+  await act(async () => root.render(React.createElement(Harness)));
+  await act(async () => finish(response({ error: 'AUTH_EXPIRED' }, 401)));
+  assert.equal(await pending, null);
+  assert.equal(recoveryTest.expired, 0);
+  assert.equal(current.error, '');
+  assert.equal(current.busy, false);
+});
+
+
+test("record effects follow actual playback, respect quiet mode and visibility, and reuse the existing player", async () => {
+  const track = audioTracks[0];
+  let paused = 0, played = 0;
+  const playback = { ...player, track, status: 'loading', wantsPlayback: true, pause: () => paused++, playTrack: async () => { played++; return true; } };
+  const connection = { snapshot: nearby(), busy: false, error: null, ready: true, online: true, now: Date.now(), request: async () => {}, enterSession() {} };
+  const render = () => act(async () => root.render(React.createElement(OnlineNearbyPanel, { nearby: connection, currentTrackId: track.id, player: playback })));
+  await render();
+  const map = () => document.querySelector('.orbit-map');
+  assert.equal(map().dataset.active, 'true');
+  assert.equal(map().dataset.playing, 'false', 'discovery and buffering do not animate a playing record');
+  playback.status = 'playing'; await render();
+  assert.equal(map().dataset.playing, 'true');
+  await act(async () => document.querySelector('.orbit-self').click());
+  assert.equal(paused, 1);
+  playback.status = 'paused'; playback.wantsPlayback = false; await render();
+  assert.equal(map().dataset.playing, 'false');
+  await act(async () => document.querySelector('.orbit-self').click());
+  assert.equal(played, 1);
+  playback.status = 'playing'; playback.wantsPlayback = true; await render();
+  await act(async () => document.querySelector('.orbit-motion-toggle').click());
+  assert.equal(map().dataset.motion, 'false');
+  assert.equal(paused, 1, 'turning motion off does not pause music');
+  await act(async () => document.querySelector('.orbit-motion-toggle').click());
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+  await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
+  assert.equal(map().dataset.motion, 'false');
+  assert.equal(document.querySelectorAll('audio').length, 0, 'the radar never creates a second player');
+  playback.track = audioTracks[1]; await render();
+  assert.equal(map().dataset.playing, 'false', 'a different track cannot animate this record');
+});
+
+
+test("avatar gestures identify the sender, never turn delivery acknowledgement into a peer reply, and ignore other songs", async () => {
+  const track = audioTracks[0];
+  let outgoing = null, incoming = null;
+  const render = () => act(async () => root.render(React.createElement(ListeningArtwork, { track, mode: 'online', role: 'guest', outgoing, incoming })));
+  await render();
+  outgoing = { id: 'hello-self', kind: 'wave', trackId: track.id, status: 'sending' }; await render();
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'wave');
+  const face = document.querySelector('[data-person="self"] .listener-avatar-face');
+  outgoing = { ...outgoing, status: 'received' }; await render();
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face'), face, 'acknowledgement does not restart the sender animation');
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
+  incoming = { id: 'hello-other-song', from: 'host', kind: 'wave', trackId: audioTracks[1].id, createdAt: Date.now() }; await render();
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
+  incoming = { ...incoming, id: 'hello-peer', trackId: track.id }; await render();
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'wave');
+  incoming = { ...incoming, id: 'wrong-sender', from: 'guest' }; await render();
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
+  outgoing = { ...outgoing, status: 'failed' }; await render();
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, undefined);
+});
+
+test("demo avatars wait for the saved reply; historical reactions do not replay when entering the view", async () => {
+  const track = audioTracks[0];
+  let outgoing = { id: 'old', kind: 'wave', trackId: track.id, status: 'received' };
+  const render = () => act(async () => root.render(React.createElement(ListeningArtwork, { track, mode: 'demo', outgoing })));
+  await render();
+  assert.equal(document.querySelectorAll('[data-gesture]').length, 0);
+  outgoing = { ...outgoing, id: 'new', status: 'sent' }; await render();
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'wave');
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
+  outgoing = { ...outgoing, status: 'received' }; await render();
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'wave');
+  await act(async () => new Promise(resolve => setTimeout(resolve, 2700)));
+  assert.equal(document.querySelectorAll('[data-gesture]').length, 0, 'completed gestures cannot replay when quiet mode is changed');
 });

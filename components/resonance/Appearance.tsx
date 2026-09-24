@@ -6,6 +6,7 @@ import { Moon, Sun } from "lucide-react";
 import { useClientReady } from "@/hooks/useClientReady";
 import { audioTracks } from "@/lib/resonance/demo-data";
 import { useHost } from "./HostProvider";
+import { MusicBackdrop } from "./MusicBackdrop";
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   return <ThemeProvider attribute="data-theme" storageKey="resonance.appearance" defaultTheme="dark" enableSystem={false} themes={["light", "dark"]} disableTransitionOnChange>{children}</ThemeProvider>;
@@ -26,6 +27,6 @@ export function MusicAtmosphere({ trackId }: { trackId?: string }) {
   const host = useHost();
   const cover = audioTracks.find(track => track.id === (trackId ?? host.trackId))?.coverUrl ?? audioTracks[0]?.coverUrl;
   return <div className="music-atmosphere" aria-hidden="true" style={{ "--atmosphere-art": cover ? `url("${cover}")` : "none" } as CSSProperties}>
-    <div className="music-atmosphere-art" /><div className="music-atmosphere-contours" />
+    <div className="music-atmosphere-art" /><div className="music-atmosphere-contours" /><MusicBackdrop />
   </div>;
 }
