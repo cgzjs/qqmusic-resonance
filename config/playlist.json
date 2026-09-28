@@ -8,7 +8,19 @@
       "audio": "/audio/yorushika-miyakoochi.mp3",
       "accent": "#6feee1",
       "source": "自备模拟歌单",
-      "cover": "/covers/yorushika-gentou.jpg"
+      "cover": "/covers/yorushika-gentou.jpg",
+      "palette": {
+        "dark": {
+          "base": "#0f1c26",
+          "accent": "#f2d28a",
+          "ink": "#f5f3ef"
+        },
+        "light": {
+          "base": "#eef3f6",
+          "accent": "#7a5a14",
+          "ink": "#13232e"
+        }
+      }
     },
     {
       "id": "yorushika-matasaburo",
@@ -17,7 +29,19 @@
       "audio": "/audio/yorushika-matasaburo.mp3",
       "accent": "#a8bdd8",
       "source": "自备模拟歌单",
-      "cover": "/covers/yorushika-matasaburo.jpg"
+      "cover": "/covers/yorushika-matasaburo.jpg",
+      "palette": {
+        "dark": {
+          "base": "#151a24",
+          "accent": "#9cc3da",
+          "ink": "#f3f4f6"
+        },
+        "light": {
+          "base": "#eff2f6",
+          "accent": "#2f5f7c",
+          "ink": "#1a2230"
+        }
+      }
     },
     {
       "id": "yorushika-roujin-to-umi",
@@ -26,7 +50,19 @@
       "audio": "/audio/yorushika-roujin-to-umi.mp3",
       "accent": "#d6b98c",
       "source": "自备模拟歌单",
-      "cover": "/covers/yorushika-roujin-to-umi.jpg"
+      "cover": "/covers/yorushika-roujin-to-umi.jpg",
+      "palette": {
+        "dark": {
+          "base": "#101a1a",
+          "accent": "#86c7d8",
+          "ink": "#f1f5f4"
+        },
+        "light": {
+          "base": "#eef4f3",
+          "accent": "#245f6e",
+          "ink": "#172322"
+        }
+      }
     },
     {
       "id": "sana-kotoba-no-iranai-yakusoku",
@@ -35,7 +71,19 @@
       "audio": "/audio/sana-kotoba-no-iranai-yakusoku.ogg",
       "accent": "#c8b3db",
       "source": "自备模拟歌单",
-      "cover": "/covers/naruto-the-best.jpg"
+      "cover": "/covers/naruto-the-best.jpg",
+      "palette": {
+        "dark": {
+          "base": "#1f150e",
+          "accent": "#e6c595",
+          "ink": "#f6f1ea"
+        },
+        "light": {
+          "base": "#f6f1ea",
+          "accent": "#7a4f25",
+          "ink": "#2a1c12"
+        }
+      }
     }
   ]
 }

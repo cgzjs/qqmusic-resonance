@@ -66,38 +66,17 @@ html[data-theme="light"] {
 .music-atmosphere { position: absolute; z-index: -1; inset: 0; overflow: hidden; pointer-events: none; background: radial-gradient(ellipse at 12% 0%,var(--music-accent-soft),transparent 52%),radial-gradient(ellipse at 95% 80%,var(--music-sky),transparent 55%),var(--music-bg); }
 .music-atmosphere-art { position: absolute; inset: -80px; background: var(--atmosphere-art) center 35% / cover; filter: blur(70px) saturate(.7); opacity: var(--music-art-opacity); }
 .music-atmosphere-contours { position: absolute; width: max(900px,140vw); aspect-ratio: 1; left: -55%; top: -30%; border-radius: 50%; background: repeating-radial-gradient(ellipse at center,transparent 0 76px,var(--music-contour) 77px 78px,transparent 79px 115px); transform: rotate(-25deg) scaleY(.8); }
-.music-app.nearby-page .room-panel, .music-room .room-panel { background: var(--music-panel); border-color: var(--music-line); }
-.music-app .room-header { background: transparent; }
+.music-room .room-panel { background: var(--music-panel); border-color: var(--music-line); }
 .music-room .room-panel { position: relative; }
-.music-header-actions { display: flex; align-items: center; gap: 16px; margin-left: auto; }
 .appearance-toggle, .room-header > .appearance-toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 7px; min-height: 44px; min-width: 44px; padding: 0 10px; border: 1px solid var(--music-line); border-radius: 24px; color: var(--music-muted); background: var(--music-hover); font: 12px/1.4 "Segoe UI","Microsoft YaHei",sans-serif; cursor: pointer; }
 .appearance-toggle:hover { color: var(--music-accent); background: var(--music-accent-soft); }
 .appearance-toggle:focus-visible { outline: 2px solid var(--music-accent); outline-offset: 3px; }
 .music-app[data-authenticated="true"] .plugin-debug:not([open]) { right: 244px; }
-.music-app .music-account-avatar { color: var(--music-accent-text); background: var(--music-accent-soft); }
-.music-app .account-controls, .music-app .current-playlist, .music-app .plugin-debug[open] { box-shadow: var(--music-shadow); }
-.music-app .current-playback { background: var(--music-player); backdrop-filter: blur(16px); }
-.music-app .current-playback-controls .current-playback-toggle { color: var(--music-bg); background: var(--music-text); }
-.music-app .current-playback-controls .current-playback-toggle:hover { color: var(--primary-foreground); }
-.music-app .current-playback-controls button { color: var(--music-text); }
-.music-app .current-playback-copy h2 { color: var(--music-text); }
-.music-app .current-playback-copy p, .music-app .current-playback-copy small { color: var(--music-muted); }
-.music-app .current-playlist-heading, .music-app .current-playlist li small, .music-app .current-playlist li button > span:last-child { color: var(--music-muted); }
-.music-app .current-playlist li button[aria-pressed="true"], .music-app .current-playlist li button:hover { background: var(--music-accent-soft); color: var(--music-accent); }
+.music-app .account-controls, .music-app .plugin-debug[open] { box-shadow: var(--music-shadow); }
 .music-app .room-primary, .music-app .primary-action, .music-room .room-primary { color: var(--primary-foreground); background: var(--music-accent); }
 .music-app .room-primary:hover, .music-room .room-primary:hover { filter: brightness(1.08); }
 .music-app .phone-stage__content { scrollbar-color: var(--music-line) transparent; }
 .music-app .phone-stage__content::-webkit-scrollbar-thumb { background: var(--music-line); }
-.music-app .nearby-orbit { position: relative; padding: 18px 20px 10px; margin-inline: -8px; border-radius: 18px; background: radial-gradient(ellipse at 50% 48%,var(--music-accent-soft),transparent 68%); border: 1px solid var(--music-line); }
-.orbit-lines > circle, .orbit-lines > path { stroke: var(--music-orbit-line); }
-.orbit-lines > circle:nth-child(2), .orbit-lines .orbit-connection { stroke: var(--music-accent); opacity: .4; }
-.orbit-lines .orbit-signal { fill: var(--music-accent); }
-.orbit-self { color: var(--music-accent-text); }
-.orbit-listener { border-color: var(--music-line); background: var(--music-raised); box-shadow: 0 3px 12px #0002; }
-.orbit-listener[aria-pressed="true"], .orbit-listener:hover { border-color: var(--music-accent); box-shadow: 0 0 0 4px var(--music-accent-soft); }
-.orbit-listener-title { background: var(--music-player); color: var(--music-text); }
-.orbit-online-dot { background: var(--music-accent); border-color: var(--music-raised); }
-.orbit-map[data-active="true"] .orbit-corner > i { background: var(--music-accent); }
 
 /* Login keeps physical vinyl records in both appearances. */
 .account-login { --login-accent: var(--music-accent); background: transparent; }
@@ -112,7 +91,7 @@ html[data-theme="light"] {
 .music-room :is(.room-members strong,.room-exchange-offer strong,.reaction-dock-heading,.reaction-action) { color: var(--music-text); }
 .music-room :is(.room-header a,.room-header > button,.room-join p,.room-progress > div,.room-volume,.room-leave,.room-footnote,.room-track-options legend,.room-track-options small,.room-exchange > p,.room-exchange-result p,.room-exchange-offer p,.room-exchange-offer span,.room-exchange-offer small,.reaction-status,.reaction-dock-heading small,.reaction-dock-heading button) { color: var(--music-muted); }
 .music-room .room-controls select, .music-room .plugin-debug select { background: var(--music-raised); color: var(--music-text); border-color: var(--music-line); }
-.music-room :is(.room-progress > input,.room-volume input,.room-track-options input), .music-app .current-playback-progress input { accent-color: var(--music-accent); }
+.music-room :is(.room-progress > input,.room-volume input,.room-track-options input) { accent-color: var(--music-accent); }
 .music-room .reaction-flight, .music-room .reaction-idle-note { background-color: var(--music-surface); }
 .music-room .room-track-options label[data-selected="true"] { border-color: var(--music-accent); background: var(--music-accent-soft); }
 .music-room .reaction-action:hover:not(:disabled) { background: var(--music-accent-soft); border-color: var(--music-accent); }
@@ -120,7 +99,6 @@ html[data-theme="light"] {
 .music-room .plugin-debug { color: var(--music-muted); border-color: var(--music-line); }
 .plugin-host-status svg { color: var(--music-accent); }
 .plugin-host-status p { color: var(--music-muted); }
-.music-app .nearby-invite > p:not(.section-kicker), .music-app .nearby-invite small { color: var(--music-muted); }
 .music-app .journey-event__meta time { color: var(--music-muted); }
 .music-app .integrated-presence button, .music-app .demo-reply-reminder span:last-child { color: var(--music-accent); }
 /* Existing scene interactions share the same palette as online listeners. */
@@ -135,11 +113,6 @@ html[data-theme="light"] {
 .music-app .song-option[data-selected="true"] .radio-mark, .music-app :is(.listen-button,.exchange-cta,.success-mark) { background: var(--music-accent); color: var(--primary-foreground); border-color: var(--music-accent); }
 .music-app .radio-mark { border-color: var(--music-muted); }
 .music-app .reaction-action:hover:not(:disabled) { background: var(--music-accent-soft); border-color: var(--music-accent); }
-.nearby-person-actions { display: grid; justify-items: end; gap: 4px; max-width: 290px; }
-.music-app .nearby-person { display: grid; grid-template-columns: auto minmax(0,1fr) auto; }
-.music-app .nearby-person-actions button { grid-column: auto; }
-.music-app .nearby-person:has(.listener-block-confirm) { grid-template-columns: auto minmax(0,1fr); }
-.nearby-person:has(.listener-block-confirm) .nearby-person-actions { grid-column: 1 / -1; width: 100%; max-width: none; }
 .listener-safety { font-size: 12px; color: var(--music-muted); }
 .listener-block-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 6px 10px; color: var(--music-muted); }
 .listener-block-trigger:hover { color: var(--music-text); }
@@ -158,14 +131,13 @@ html[data-theme="light"] {
 .blocked-list-row small { display: block; margin-top: 3px; color: var(--music-muted); font-size: 11px; }
 .blocked-list-row button { flex-shrink: 0; min-height: 44px; padding: 6px; color: var(--music-accent); }
 .blocked-list-content button:disabled { opacity: .5; cursor: wait; }
-@media (max-width: 520px) { .music-app .nearby-person { grid-template-columns: auto minmax(0,1fr); } .music-app .nearby-person-actions { grid-column: 2; max-width: 100%; justify-items: start; } .music-app .nearby-person-actions button { min-height: 44px; } }
 .music-room .reaction-endpoint { color: var(--music-accent); border-color: var(--music-line); }
 .music-room .room-audio-notice button { color: var(--music-accent); }
 
 [data-sonner-toaster] [data-sonner-toast].demo-reply-toast { --normal-bg: var(--music-raised); --normal-text: var(--music-text); --normal-border: var(--music-line); box-shadow: var(--music-shadow); }
 [data-sonner-toaster] [data-sonner-toast].demo-reply-toast [data-description], [data-sonner-toaster] [data-sonner-toast].demo-reply-toast [data-close-button] { color: var(--music-muted); }
 [data-sonner-toaster] [data-sonner-toast].demo-reply-toast [data-button] { background: var(--music-accent); color: var(--primary-foreground); }
-html[data-theme="light"] :is(.room-error,.room-audio-notice,.current-playback-error,.reaction-status[data-error="true"]) { color: #a13030; background: #fff1ed; border-color: #a1303033; }
+html[data-theme="light"] :is(.room-error,.room-audio-notice,.reaction-status[data-error="true"]) { color: #a13030; background: #fff1ed; border-color: #a1303033; }
 
 /* The cover belongs to the same appearance, including its preview panels. */
 html[data-theme="light"] .resonance-cover { color-scheme: light; --terminal-bg: #f5f8f5; --terminal-panel: #eef4ee; --terminal-deep: #e7f0e9; --terminal-raised: #e1ece4; --terminal-ink: #242d29; --terminal-muted: #65746d; --terminal-cyan: #07854e; --terminal-line: #aec7b7; --terminal-soft-line: #d0dfd4; background-image: radial-gradient(#b1c9bb .7px,transparent .7px); }
@@ -177,17 +149,12 @@ html[data-theme="light"] .resonance-cover .listening-waveform__cursor i, html[da
 html[data-theme="light"] .resonance-cover .terminal-cta { color: #fff; }
 .resonance-cover .appearance-toggle { margin-left: 0; }
 @media (max-width: 520px) {
-  .music-header-actions { gap: 10px; }
-  .music-account-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .music-account-menu summary { justify-content: center; min-width: 44px; }
   .music-app[data-authenticated="true"] .plugin-debug:not([open]) { right: 166px; }
-  .music-app .nearby-orbit { padding: 14px 14px 8px; margin-inline: -4px; }
-  .music-app[data-authenticated="false"] .room-header { padding-inline: 20px; }
   .resonance-cover .terminal-header { gap: 10px; }
   .resonance-cover .appearance-toggle { width: 44px; padding: 0; }
   .resonance-cover .appearance-toggle > span { display: none; }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .music-app.nearby-page .room-panel, .music-room .room-panel { background: var(--music-bg); }
-  .music-app .current-playback { background: var(--music-surface); backdrop-filter: none; }
+  .music-room .room-panel { background: var(--music-bg); }
 }

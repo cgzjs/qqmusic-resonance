@@ -1,0 +1,257 @@
+/*
+ * 封面驱动外观（附近页）。
+ * 每首歌的配色由 playlist:prepare 校验后写入 catalog，组件以 --cover-{dark,light}-* 内联到 .cover-scope；
+ * 这里按当前日夜外观选出一组，再派生出层级色，并桥接旧的 --music-* 变量，让尚未迁移的视图一起跟随封面变色。
+ * 本文件最后加载：同等优先级下覆盖旧样式，新组件只用 tp- 前缀的类。
+ */
+
+.cover-scope {
+  --cover-base: var(--cover-dark-base, #121416);
+  --cover-accent: var(--cover-dark-accent, #6feee1);
+  --cover-ink: var(--cover-dark-ink, #f4f5f6);
+  --cover-ink-2: color-mix(in srgb, var(--cover-ink) 72%, transparent);
+  --cover-ink-3: color-mix(in srgb, var(--cover-ink) 54%, transparent);
+  --cover-glass: color-mix(in srgb, var(--cover-base) 62%, transparent);
+  --cover-scrim-top: color-mix(in srgb, var(--cover-base) 52%, transparent);
+  --cover-scrim-mid: color-mix(in srgb, var(--cover-base) 78%, transparent);
+  --cover-scrim-end: color-mix(in srgb, var(--cover-base) 95%, transparent);
+  --cover-shadow: 0 12px 28px -8px rgb(0 0 0 / .5);
+  color-scheme: dark;
+}
+html[data-theme="light"] .cover-scope {
+  --cover-base: var(--cover-light-base, #f4f5f6);
+  --cover-accent: var(--cover-light-accent, #387771);
+  --cover-ink: var(--cover-light-ink, #16191c);
+  --cover-ink-2: color-mix(in srgb, var(--cover-ink) 74%, transparent);
+  --cover-ink-3: color-mix(in srgb, var(--cover-ink) 66%, transparent);
+  --cover-glass: color-mix(in srgb, var(--cover-base) 70%, transparent);
+  --cover-scrim-top: color-mix(in srgb, var(--cover-base) 66%, transparent);
+  --cover-scrim-mid: color-mix(in srgb, var(--cover-base) 84%, transparent);
+  --cover-scrim-end: color-mix(in srgb, var(--cover-base) 96%, transparent);
+  --cover-shadow: 0 12px 28px -10px rgb(0 0 0 / .22);
+  color-scheme: light;
+}
+.cover-scope {
+  --cover-line: color-mix(in srgb, var(--cover-ink) 14%, transparent);
+  --cover-wash: color-mix(in srgb, var(--cover-ink) 6%, transparent);
+  --cover-tone-soft: color-mix(in srgb, var(--cover-accent) 16%, var(--cover-base));
+  --cover-surface: color-mix(in srgb, var(--cover-ink) 6%, var(--cover-base));
+  --cover-raised: color-mix(in srgb, var(--cover-ink) 10%, var(--cover-base));
+  --cover-danger: #f0907e;
+
+  /* 旧变量桥接 */
+  --music-bg: var(--cover-base);
+  --music-surface: var(--cover-surface);
+  --music-raised: var(--cover-raised);
+  --music-text: var(--cover-ink);
+  --music-muted: var(--cover-ink-2);
+  --music-line: var(--cover-line);
+  --music-hover: var(--cover-wash);
+  --music-accent: var(--cover-accent);
+  --music-accent-text: var(--cover-accent);
+  --music-accent-soft: var(--cover-tone-soft);
+  --music-brand: var(--cover-accent);
+  --music-panel: transparent;
+  --music-player: var(--cover-glass);
+  --music-contour: transparent;
+  --music-orbit-line: var(--cover-line);
+  --music-shadow: var(--cover-shadow);
+  --background: var(--cover-base);
+  --foreground: var(--cover-ink);
+  --card: var(--cover-surface);
+  --card-foreground: var(--cover-ink);
+  --popover: var(--cover-raised);
+  --popover-foreground: var(--cover-ink);
+  --primary: var(--cover-accent);
+  --primary-foreground: var(--cover-base);
+  --muted-foreground: var(--cover-ink-2);
+  --border: var(--cover-line);
+  --ring: var(--cover-accent);
+}
+html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
+
+/* ============ 外壳 ============ */
+.tp-app {
+  --tp-ease: cubic-bezier(.2, .7, .2, 1);
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  background: var(--cover-base);
+  color: var(--cover-ink);
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color .6s var(--tp-ease), color .6s var(--tp-ease);
+}
+.tp-app :is(button, a, summary, input):focus-visible { outline: 2px solid var(--cover-accent); outline-offset: 2px; }
+.tp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.tp-art { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.tp-art .tp-art-img { inset: -12% !important; width: 124% !important; height: 124% !important; object-fit: cover; filter: blur(56px) saturate(1.35); transform: scale(1.08); }
+.tp-art .tp-art-img--enter { animation: tp-fade .9s var(--tp-ease) both; }
+.tp-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, var(--cover-scrim-top) 0%, var(--cover-scrim-mid) 42%, var(--cover-scrim-end) 100%); }
+
+.tp-shell { position: relative; z-index: 1; display: flex; flex-direction: column; width: 100%; max-width: 440px; height: 100%; min-height: 0; margin: 0 auto; }
+.tp-top { display: flex; flex-shrink: 0; align-items: center; gap: 4px; min-height: 56px; padding: calc(6px + env(safe-area-inset-top)) 12px 0 16px; }
+.tp-brand { display: flex; align-items: center; gap: 8px; margin-right: auto; color: var(--cover-ink); font-size: 17px; font-weight: 700; letter-spacing: .02em; text-decoration: none; }
+.tp-brand > svg { color: var(--cover-accent); }
+.tp-top-actions { display: flex; align-items: center; gap: 4px; }
+.tp-icon-btn { display: grid; flex: none; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: none; color: var(--cover-ink-2); cursor: pointer; }
+.tp-icon-btn:hover:not(:disabled) { color: var(--cover-ink); background: var(--cover-wash); }
+.tp-icon-btn:disabled { opacity: .45; cursor: default; }
+.tp-app .tp-account { margin-left: 0; }
+.tp-app .tp-account summary { justify-content: center; width: 44px; min-height: 44px; border-radius: 999px; }
+.tp-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--cover-line); color: var(--cover-ink); font-size: 13px; font-weight: 700; }
+/* 调试面板“设置”入口排在外观按钮左侧：12 + 44 + 4 + 44 + 4 */
+.tp-app[data-authenticated="true"] .plugin-debug:not([open]) { top: calc(6px + env(safe-area-inset-top)); right: 108px; }
+.tp-app .plugin-debug[open] { top: 60px; right: 12px; width: min(360px, calc(100% - 24px)); background: var(--cover-raised); }
+.tp-app[data-authenticated="false"] .plugin-debug[open] { background: var(--cover-surface); }
+
+/* 顶部标签：附近 / 足迹与收藏 */
+.tp-app .integrated-experience .phone-stage { background: none; }
+.tp-app .phone-stage .bottom-nav { gap: 24px; min-height: 44px; padding: 0 16px; border-bottom: 1px solid var(--cover-line); background: none; backdrop-filter: none; }
+.tp-app .bottom-nav > button { position: relative; gap: 6px; min-height: 44px; border-bottom: 0; color: var(--cover-ink-3); }
+.tp-app .bottom-nav > button[data-active="true"] { color: var(--cover-ink); }
+.tp-app .bottom-nav > button[data-active="true"]::after { content: ""; position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; border-radius: 2px; background: var(--cover-accent); }
+.tp-app .bottom-nav button svg { display: none; }
+.tp-app .bottom-nav button span { font-size: 15px; font-weight: 500; }
+.tp-app .bottom-nav > button[data-active="true"] span { font-weight: 600; }
+.tp-app .unread-count { min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 999px; background: var(--cover-accent); color: var(--cover-base); font-family: inherit; font-size: 11px; font-weight: 700; line-height: 1; }
+.tp-app :is(.integrated-presence, .integrated-invite-notice, .demo-reply-reminder) { padding-inline: 16px; background: var(--cover-tone-soft); color: var(--cover-ink); }
+.tp-app :is(.integrated-invite-notice, .demo-reply-reminder) > span:last-child, .tp-app .integrated-presence button { color: var(--cover-accent); }
+.tp-app .phone-stage__content { scrollbar-color: var(--cover-line) transparent; }
+
+/* ============ 附近：雷达 ============ */
+.tp-nearby { padding: 0 16px 16px; }
+.tp-stage { position: relative; }
+.tp-motion { position: absolute; top: 4px; right: -8px; z-index: 3; }
+.tp-motion[aria-pressed="true"] { color: var(--cover-accent); }
+
+.tp-radar { --size: min(100%, 340px, max(220px, calc(100dvh - 470px))); position: relative; width: var(--size); aspect-ratio: 1; margin: 16px auto 8px; }
+.tp-rings { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tp-rings circle { fill: none; stroke: var(--cover-ink); stroke-opacity: .13; stroke-width: .3; }
+.tp-rings .tp-rings-orbit { stroke-dasharray: .6 1.6; stroke-opacity: .22; }
+.tp-radar[data-active="false"] .tp-rings circle { stroke-opacity: .07; }
+.tp-rings .tp-route { fill: none; stroke: var(--cover-accent); stroke-width: .5; stroke-opacity: .85; stroke-dasharray: 1.4 1.8; }
+.tp-rings .tp-signal { fill: var(--cover-accent); stroke: none; }
+.tp-sweep { position: absolute; inset: 1%; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0 300deg, color-mix(in srgb, var(--cover-accent) 22%, transparent) 360deg); -webkit-mask: radial-gradient(circle, transparent 23%, #000 24%); mask: radial-gradient(circle, transparent 23%, #000 24%); opacity: 0; transition: opacity .6s; pointer-events: none; }
+.tp-radar[data-active="true"] .tp-sweep { opacity: 1; }
+.tp-radar[data-active="true"][data-motion="true"] .tp-sweep { animation: tp-spin 9s linear infinite; }
+
+.tp-disc { position: absolute; top: 50%; left: 50%; width: 46%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--cover-ink); transform: translate(-50%, -50%); cursor: pointer; }
+.tp-disc:disabled { cursor: default; }
+.tp-app .tp-disc:focus-visible { outline-offset: 4px; }
+.tp-spinner { position: absolute; inset: 0; border-radius: 50%; }
+.tp-radar[data-playing="true"][data-motion="true"] .tp-spinner { animation: tp-spin 7s linear infinite; }
+.tp-vinyl { position: absolute; inset: 0; border-radius: 50%; background: repeating-radial-gradient(circle, #151515 0 1.2px, #1d1d1d 1.2px 2.6px), #161616; box-shadow: 0 18px 40px -12px rgb(0 0 0 / .55), inset 0 0 0 1px rgb(255 255 255 / .06); }
+.tp-vinyl::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 40deg, transparent 0 20%, rgb(255 255 255 / .09) 25%, transparent 32% 70%, rgb(255 255 255 / .06) 76%, transparent 82%); }
+.tp-label { position: absolute; inset: 19%; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: #222; color: #ddd; box-shadow: 0 0 0 3px #111; }
+.tp-app .tp-label .album-tile { width: 100%; height: 100%; border-radius: 50%; background: #222; color: #aaa; }
+.tp-label::after { content: ""; position: absolute; top: 50%; left: 50%; z-index: 3; width: 9%; aspect-ratio: 1; border-radius: 50%; background: #111; box-shadow: 0 0 0 2px rgb(255 255 255 / .2); transform: translate(-50%, -50%); }
+.tp-disc-state { position: absolute; right: -2%; bottom: 4%; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; background: var(--cover-accent); color: var(--cover-base); box-shadow: 0 6px 16px -6px rgb(0 0 0 / .5); pointer-events: none; }
+.tp-disc-state[data-loading="true"] { animation: tp-breathe 1.2s ease-in-out infinite alternate; }
+.tp-disc:disabled .tp-disc-state { display: none; }
+
+.tp-peer { position: absolute; z-index: 2; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: none; transform: translate(-50%, -50%); cursor: pointer; transition: width .35s var(--tp-ease), height .35s var(--tp-ease); animation: tp-arrive .5s var(--tp-ease) both; }
+.tp-app .tp-peer .album-tile { width: 100%; height: 100%; border-radius: 8px; box-shadow: 0 8px 18px -8px rgb(0 0 0 / .6); }
+.tp-peer::after { content: ""; position: absolute; top: -3px; right: -3px; z-index: 3; width: 10px; height: 10px; border-radius: 50%; background: var(--cover-accent); box-shadow: 0 0 0 2px var(--cover-base); }
+.tp-peer[aria-pressed="true"] { width: 58px; height: 58px; }
+.tp-app .tp-peer[aria-pressed="true"] .album-tile { box-shadow: 0 0 0 2px var(--cover-accent), 0 10px 22px -8px rgb(0 0 0 / .6); }
+
+/* ============ 附近：发现开关 ============ */
+.tp-discovery { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.tp-discovery-copy { flex: 1; min-width: 0; }
+.tp-discovery h2 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.35; }
+.tp-discovery p { margin: 2px 0 0; color: var(--cover-ink-2); font-size: 13px; line-height: 1.5; }
+.tp-switch { display: flex; flex: none; align-items: center; gap: 8px; height: 44px; padding: 0 4px 0 12px; border: 0; border-radius: 999px; background: none; color: var(--cover-ink-2); font-size: 13px; cursor: pointer; }
+.tp-switch:disabled { opacity: .45; cursor: default; }
+.tp-switch-track { position: relative; width: 44px; height: 26px; border-radius: 999px; background: var(--cover-line); box-shadow: inset 0 0 0 1px var(--cover-line); transition: background .25s; }
+.tp-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--cover-ink); transition: transform .25s var(--tp-ease); }
+.tp-switch[aria-checked="true"] .tp-switch-track { background: var(--cover-accent); }
+.tp-switch[aria-checked="true"] .tp-switch-track::after { background: var(--cover-base); transform: translateX(18px); }
+
+/* ============ 附近：听众 / 邀请卡片 ============ */
+.tp-sheet { margin-top: 4px; padding: 16px; border-radius: 16px; background: var(--cover-glass); box-shadow: inset 0 0 0 1px var(--cover-line); -webkit-backdrop-filter: blur(24px) saturate(1.2); backdrop-filter: blur(24px) saturate(1.2); animation: tp-rise .35s var(--tp-ease); }
+.tp-sheet + .tp-sheet { margin-top: 12px; }
+.tp-sheet-row { display: flex; align-items: center; gap: 12px; }
+.tp-app .tp-sheet-row .album-tile { flex: none; width: 56px; height: 56px; border-radius: 8px; }
+.tp-sheet-meta { flex: 1; min-width: 0; }
+.tp-sheet-who { margin: 0; color: var(--cover-ink-3); font-size: 12px; }
+.tp-sheet h3 { margin: 2px 0 0; overflow: hidden; font-size: 17px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tp-invite h3 { white-space: normal; }
+.tp-sheet-copy { margin: 2px 0 0; color: var(--cover-ink-2); font-size: 13px; }
+.tp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.tp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: none; color: var(--cover-ink); font-size: 15px; font-weight: 600; cursor: pointer; }
+.tp-btn:disabled { opacity: .45; cursor: default; }
+.tp-btn--primary { flex: 1; background: var(--cover-accent); color: var(--cover-base); }
+.tp-btn--quiet { box-shadow: inset 0 0 0 1px var(--cover-line); }
+.tp-btn--quiet:hover:not(:disabled) { background: var(--cover-wash); }
+.tp-sheet .listener-safety { color: var(--cover-ink-2); }
+.tp-actions .listener-safety:has(.listener-block-confirm, [role="status"], [role="alert"]) { flex-basis: 100%; }
+.tp-invite > .listener-safety { margin-top: 4px; }
+.tp-timer { height: 2px; margin-top: 12px; overflow: hidden; border-radius: 2px; background: var(--cover-line); }
+.tp-timer i { display: block; height: 100%; background: var(--cover-accent); transform-origin: left; transition: transform 1s linear; }
+.tp-timer-copy { display: block; margin-top: 6px; color: var(--cover-ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tp-chips { display: flex; gap: 8px; margin-top: 12px; padding-bottom: 2px; overflow-x: auto; }
+.tp-chip { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--cover-ink-2); font-size: 12px; box-shadow: inset 0 0 0 1px var(--cover-line); cursor: pointer; }
+.tp-chip b { color: var(--cover-ink); font-weight: 600; }
+.tp-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--cover-accent); color: var(--cover-ink); }
+.tp-app .tp-nearby .room-error { margin-top: 12px; }
+
+/* ============ 播放栏 ============ */
+.tp-player { position: relative; z-index: 30; flex-shrink: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--cover-glass); box-shadow: 0 -1px 0 var(--cover-line); -webkit-backdrop-filter: blur(28px) saturate(1.2); backdrop-filter: blur(28px) saturate(1.2); }
+.tp-player-top { display: flex; align-items: center; gap: 12px; }
+.tp-app .tp-player-top > .album-tile, .tp-player-empty { flex: none; width: 44px; height: 44px; border-radius: 6px; }
+.tp-player-empty { display: grid; place-items: center; background: var(--cover-line); color: var(--cover-ink-2); }
+.tp-player-meta { flex: 1; min-width: 0; }
+.tp-player-meta strong { display: block; overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tp-player-meta small { display: block; overflow: hidden; color: var(--cover-ink-2); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.tp-player .tp-icon-btn { color: var(--cover-ink); }
+.tp-fav[aria-pressed="true"] { color: var(--cover-accent) !important; }
+.tp-player-bottom { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.tp-play { display: grid; flex: none; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: var(--cover-ink); color: var(--cover-base); cursor: pointer; }
+.tp-play:disabled { opacity: .45; cursor: default; }
+.tp-progress { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; margin-left: 8px; color: var(--cover-ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tp-progress input { flex: 1; min-width: 0; height: 44px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.tp-progress input:disabled { cursor: default; }
+.tp-progress input::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--cover-ink) var(--p, 0%), var(--cover-line) var(--p, 0%)); }
+.tp-progress input::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4.5px; border-radius: 50%; background: var(--cover-ink); -webkit-appearance: none; appearance: none; }
+.tp-progress input::-moz-range-track { height: 3px; border-radius: 3px; background: var(--cover-line); }
+.tp-progress input::-moz-range-progress { height: 3px; border-radius: 3px; background: var(--cover-ink); }
+.tp-progress input::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--cover-ink); }
+.tp-player-error { margin: 8px 0 0; color: var(--cover-danger); font-size: 12px; }
+
+.tp-playlist { position: absolute; right: 12px; bottom: calc(100% + 8px); left: 12px; max-height: min(420px, 60dvh); padding: 4px; overflow-y: auto; border-radius: 16px; background: var(--cover-raised); box-shadow: var(--cover-shadow), inset 0 0 0 1px var(--cover-line); }
+.tp-playlist[hidden] { display: none; }
+.tp-playlist-heading { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 12px 6px; }
+.tp-playlist-heading strong { font-size: 15px; font-weight: 600; }
+.tp-playlist-heading span, .tp-playlist > p { color: var(--cover-ink-3); font-size: 12px; }
+.tp-playlist > p { padding: 12px; margin: 0; }
+.tp-playlist ul { margin: 0; padding: 0; list-style: none; }
+.tp-playlist li button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: var(--cover-ink); text-align: left; cursor: pointer; }
+.tp-playlist li button:hover { background: var(--cover-wash); }
+.tp-app .tp-playlist li .album-tile { flex: none; width: 40px; height: 40px; border-radius: 6px; }
+.tp-playlist li button > span:nth-of-type(1) { flex: 1; min-width: 0; }
+.tp-playlist li strong { display: block; overflow: hidden; font-size: 15px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.tp-playlist li small { display: block; color: var(--cover-ink-2); font-size: 12px; }
+.tp-playlist li button > span:last-child { color: var(--cover-ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tp-playlist li button[aria-pressed="true"] strong { color: var(--cover-accent); }
+
+@keyframes tp-spin { to { transform: rotate(360deg); } }
+@keyframes tp-fade { from { opacity: 0; } }
+@keyframes tp-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes tp-arrive { from { opacity: 0; transform: translate(-50%, -50%) scale(.6); } }
+@keyframes tp-breathe { from { opacity: .6; } }
+
+@media (max-width: 360px) {
+  .tp-progress-total { display: none; }
+  .tp-app .phone-stage .bottom-nav { gap: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tp-app *, .tp-app *::before, .tp-app *::after { animation-duration: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; }
+  .tp-rings .tp-signal { display: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .tp-sheet, .tp-player { background: var(--cover-surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

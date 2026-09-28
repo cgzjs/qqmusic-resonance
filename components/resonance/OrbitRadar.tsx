@@ -9,26 +9,23 @@ const subscribeVisibility = (notify: () => void) => { document.addEventListener(
 const readVisible = () => document.visibilityState !== "hidden";
 const serverVisible = () => true;
 
+/** The record is the current song; listeners sit on the r=40 orbit (positions are percentages of the radar). */
 export function OrbitRadar({ active, playing = false, loading = false, motion = true, onTogglePlayback, track, listeners, selectedId, onSelect }: Props) {
   const visible = useSyncExternalStore(subscribeVisibility, readVisible, serverVisible);
   const selected = listeners.find(listener => listener.id === selectedId);
-  const route = selected ? `M 200 200 Q ${200 + (selected.position.x - 50) * 2 + 22} ${200 + (selected.position.y - 50) * 2 - 22} ${selected.position.x * 4} ${selected.position.y * 4}` : "";
-  return <section className="orbit-map" aria-label="附近音乐雷达" data-active={active} data-playing={playing} data-motion={motion && visible} data-crowded={listeners.length > 1}>
-    <svg className="orbit-lines" viewBox="0 0 400 400" aria-hidden="true">
-      <circle cx="200" cy="200" r="72" /><circle cx="200" cy="200" r="120" /><circle cx="200" cy="200" r="174" />
-      {Array.from({ length: 24 }, (_, index) => <path key={index} d={`M 200 18 V ${index % 6 === 0 ? 29 : 23}`} transform={`rotate(${index * 15} 200 200)`} />)}
-      {selected && <><path className="orbit-connection" d={route} />{active && motion && visible && <circle className="orbit-signal" r="3"><animateMotion dur="3.8s" repeatCount="indefinite" path={route} /></circle>}</>}
+  const route = selected ? `M 50 50 Q ${50 + (selected.position.x - 50) / 2 + 6} ${50 + (selected.position.y - 50) / 2 - 6} ${selected.position.x} ${selected.position.y}` : "";
+  return <section className="orbit-map tp-radar" aria-label="附近音乐雷达" data-active={active} data-playing={playing} data-motion={motion && visible} data-crowded={listeners.length > 1}>
+    <svg className="tp-rings" viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="49.4" /><circle className="tp-rings-orbit" cx="50" cy="50" r="40" /><circle cx="50" cy="50" r="31" />
+      {selected && <><path className="tp-route" d={route} />{active && motion && visible && <circle className="tp-signal" r="1"><animateMotion dur="3.8s" repeatCount="indefinite" path={route} /></circle>}</>}
     </svg>
-    <button type="button" className="orbit-self" disabled={!track || !onTogglePlayback} onClick={onTogglePlayback} aria-label={`${playing || loading ? "暂停" : "播放"}唱片${track ? ` ${track.track}` : ""}`}>
-      <span className="orbit-aura" aria-hidden="true" /><span className="orbit-ripple orbit-ripple--one" aria-hidden="true" /><span className="orbit-ripple orbit-ripple--two" aria-hidden="true" />
-      <span className="orbit-disc"><span className="orbit-vinyl" aria-hidden="true"><i /></span>{track ? <AlbumTile coverUrl={track.coverUrl} accent={track.accent} size="md" /> : <Headphones size={28} aria-hidden="true" />}</span>
-      <span className="orbit-disc-control" aria-hidden="true">{playing || loading ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}</span>
-      <span className="orbit-self-label"><span className="orbit-equalizer" aria-hidden="true"><i /><i /><i /><i /></span>{loading ? "正在加载" : playing ? "正在播放" : "点击听听"}</span>
+    <span className="tp-sweep" aria-hidden="true" />
+    <button type="button" className="orbit-self tp-disc" disabled={!track || !onTogglePlayback} onClick={onTogglePlayback} aria-label={`${playing || loading ? "暂停" : "播放"}唱片${track ? ` ${track.track}` : ""}`}>
+      <span className="tp-spinner" aria-hidden="true"><span className="tp-vinyl" /><span className="tp-label">{track ? <AlbumTile coverUrl={track.coverUrl} accent={track.accent} size="lg" /> : <Headphones size={28} />}</span></span>
+      <span className="tp-disc-state" data-loading={loading} aria-hidden="true">{playing || loading ? <Pause size={18} fill="currentColor" strokeWidth={0} /> : <Play size={18} fill="currentColor" strokeWidth={0} />}</span>
     </button>
-    {listeners.map(listener => <button type="button" className="orbit-listener" key={listener.id} aria-label={`查看在线歌曲 ${listener.track}`} aria-pressed={listener.id === selectedId} data-upper={listener.position.y < 35} style={{ left: `${listener.position.x}%`, top: `${listener.position.y}%`, "--orbit-accent": listener.accent } as CSSProperties} onClick={() => onSelect(listener)}>
-      <span className="orbit-listener-cover"><AlbumTile coverUrl={listener.coverUrl} accent={listener.accent} size="sm" /><span className="orbit-online-dot" aria-hidden="true" /></span>
-      <span className="orbit-listener-title">{listener.track}</span>
+    {listeners.map(listener => <button type="button" className="orbit-listener tp-peer" key={listener.id} aria-label={`查看在线歌曲 ${listener.track}`} aria-pressed={listener.id === selectedId} data-upper={listener.position.y < 35} style={{ left: `${listener.position.x}%`, top: `${listener.position.y}%` } as CSSProperties} onClick={() => onSelect(listener)}>
+      <AlbumTile coverUrl={listener.coverUrl} accent={listener.accent} size="sm" />
     </button>)}
-    <span className="orbit-corner" aria-hidden="true">{active ? "正在发现" : "待开启"}<i /></span>
   </section>;
 }

@@ -3,6 +3,7 @@ import "./globals.css";
 import "./product.css";
 import "./appearance.css";
 import "./mobile-music.css";
+import "./cover.css";
 import { HostProvider } from "@/components/resonance/HostProvider";
 import { AppearanceProvider } from "@/components/resonance/Appearance";
 
