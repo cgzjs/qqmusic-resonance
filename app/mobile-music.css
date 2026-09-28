@@ -21,15 +21,12 @@
 
 /* QQ Music-inspired bright green controls over neutral white / charcoal. */
 .music-app .room-primary,
-.music-app .primary-action,
-.music-room .room-primary {
+.music-app .primary-action {
   background: var(--music-brand); color: #073b27;
 }
-.music-room .room-panel { max-width: 600px; }
-.music-room .room-now-playing { padding: 28px 0 18px; }
 .listening-artwork { display: grid; grid-template-columns: 52px minmax(0,1fr) 52px; align-items: center; gap: 14px; width: min(100%,364px); margin-inline: auto; padding: 14px 0; }
 .listening-portrait { position: relative; width: min(100%,168px); aspect-ratio: 1; justify-self: center; }
-.music-app .listening-portrait > .album-tile, .music-room .listening-portrait > .album-tile { position: relative; width: 100%; height: 100%; border-radius: 18px; box-shadow: 0 12px 32px #142c201c; animation: none; }
+.music-app .listening-portrait > .album-tile { position: relative; width: 100%; height: 100%; border-radius: 18px; box-shadow: 0 12px 32px #142c201c; animation: none; }
 .listening-portrait-orbit { position: absolute; inset: -16px; border: 1px solid var(--music-line); border-radius: 26px; transform: rotate(-7deg); }
 .listener-avatar { position: relative; display: grid; justify-items: center; gap: 5px; min-width: 0; color: var(--music-muted); text-align: center; }
 .listener-avatar-face { position: relative; display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 5px; border: 1px solid var(--music-line); border-radius: 50%; background: var(--music-accent-soft); color: var(--music-accent-text); transform-origin: 50% 90%; }
@@ -45,7 +42,7 @@ html[data-theme="light"] .listener-avatar[data-person="peer"] .listener-avatar-f
 .listener-avatar-gesture { position: absolute; top: -16px; right: -10px; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--music-line); border-radius: 14px 14px 14px 3px; background: var(--music-raised); box-shadow: var(--music-shadow); pointer-events: none; animation: avatar-bubble 2.6s ease both; }
 .listener-avatar-gesture .interaction-glyph { width: 22px; height: 22px; background: var(--music-accent); mask: url('/assets/interaction/wave.svg') center / contain no-repeat; }
 .listener-avatar-gesture .interaction-glyph[data-kind="heart"] { mask-image: url('/assets/interaction/heart.svg'); }
-.music-room .reaction-signal, .listening-view .reaction-signal { display: none; }
+.listening-view .reaction-signal { display: none; }
 .listener-avatar[data-quiet="true"] .listener-avatar-face { animation: none; }
 .listener-avatar[data-quiet="true"] .listener-avatar-gesture { animation-name: avatar-bubble-static; }
 @keyframes avatar-wave { 0%,100% { transform: rotate(0); } 20% { transform: translateY(-3px) rotate(-11deg); } 50% { transform: translateY(-3px) rotate(11deg); } 80% { transform: rotate(-5deg); } }

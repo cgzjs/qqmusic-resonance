@@ -54,7 +54,6 @@
 .music-app .interaction-credit { color: var(--music-muted); font-size: 11px; }
 .music-app .room-error { background: #2c2021; color: #f4b4ad; }
 .music-app[data-authenticated="false"] { height: auto; min-height: 100dvh; padding: 24px 16px; overflow: auto; }
-.music-app[data-authenticated="false"] > .room-panel { max-width: 560px; height: auto; border: 1px solid var(--music-line); border-radius: 8px; }
 .music-app[data-authenticated="false"] .account-login { background: none; }
 .music-app[data-authenticated="false"] .plugin-debug { position: static; padding: 6px 20px; border-top: 1px solid var(--music-line); }
 .music-app[data-authenticated="false"] .plugin-debug[open] { width: auto; max-height: none; overflow: visible; background: var(--music-surface); box-shadow: none; }
@@ -69,26 +68,3 @@
   .music-app .plugin-debug { top: 7px; right: 118px; }
   .music-app .integrated-presence, .music-app .integrated-invite-notice, .music-app .demo-reply-reminder { padding-inline: 20px; }
 }
-
-/* The listening room uses the same quieter material and typography. */
-.music-room { background: #101113; color: var(--music-text); }
-.music-room .room-panel { max-width: 860px; border-color: var(--music-line); border-radius: 8px; background: var(--music-surface); box-shadow: none; }
-.music-room .room-header { border-color: var(--music-line); }
-.music-room .room-content { padding: 28px 36px; }
-.music-room .room-title h1 { text-shadow: none; font-size: 26px; font-weight: 500; }
-.music-room .room-title > div > p { display: none; }
-.music-room .room-title .room-connection { color: var(--music-muted); }
-.music-room .room-members { padding: 24px 0; border-bottom: 1px solid var(--music-line); }
-.music-room .room-members > span[data-online="true"] { color: var(--music-accent-text); }
-.music-room .room-now-playing { padding: 28px 0 20px; }
-.music-room .room-now-playing > .album-tile { width: 180px; height: 180px; }
-.music-room .room-now-playing h2 { margin-top: 18px; font-size: 22px; font-weight: 500; }
-.music-room .room-now-playing p { color: var(--music-muted); }
-.music-room .room-follow-status { border: 0; background: var(--music-surface); color: var(--music-muted); }
-.music-room .room-secondary { border-color: var(--music-line); color: var(--music-text); }
-.music-room .room-primary { background: var(--music-accent); }
-.music-room .room-exchange, .music-room .reaction-dock { padding-inline: 0; border: 0; border-top: 1px solid var(--music-line); border-radius: 0; background: none; }
-.music-room .reaction-action { border-color: var(--music-line); border-radius: 5px; background: var(--music-surface); }
-.music-room .room-track-options label { border-color: var(--music-line); border-radius: 5px; background: var(--music-hover); }
-.music-room .room-track-options label[data-selected="true"] { border-color: #72dece66; background: #72dece08; }
-@media (max-width: 520px) { .music-room { padding: 0; } .music-room .room-panel { border: 0; border-radius: 0; } .music-room .room-content { padding: 24px 20px; } }
