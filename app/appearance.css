@@ -99,7 +99,6 @@ html[data-theme="light"] {
 .music-room .plugin-debug { color: var(--music-muted); border-color: var(--music-line); }
 .plugin-host-status svg { color: var(--music-accent); }
 .plugin-host-status p { color: var(--music-muted); }
-.music-app .journey-event__meta time { color: var(--music-muted); }
 .music-app .integrated-presence button, .music-app .demo-reply-reminder span:last-child { color: var(--music-accent); }
 /* Existing scene interactions share the same palette as online listeners. */
 .music-app :is(.scene-bar,.insight-card__title,.recommend-note p,.exchange-waiting-song,.reaction-dock-heading,.reaction-action) { color: var(--music-text); }

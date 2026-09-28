@@ -30,47 +30,10 @@
 .music-app .bottom-nav button svg { width: 17px; height: 17px; }
 .music-app .bottom-nav button span { font-size: 14px; font-weight: 500; }
 .music-app .screen-view, .music-app .radar-home { min-height: 0; padding: 24px 32px 32px; animation: none; }
-.music-app .journey-header { display: block; margin: 0; }
-.music-app .journey-header h2, .music-app .radar-heading h2 { margin: 0; color: var(--music-text); font-size: 24px; font-weight: 550; line-height: 1.4; }
-.music-app .journey-header p { margin: 8px 0 0; color: var(--music-muted); font-size: 13px; line-height: 1.6; letter-spacing: 0; text-transform: none; }
-.music-app .stat-grid { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 10px; }
-.music-app .stat-grid article { display: inline-flex; align-items: baseline; gap: 7px; padding: 0; border: 0; border-radius: 0; background: none; }
-.music-app .stat-grid article svg { display: none; }
-.music-app .stat-grid span { color: var(--music-muted); font-size: 12px; }
-.music-app .stat-grid strong { margin: 0; font-size: 13px; font-weight: 500; color: var(--music-text); }
-.music-app .library-tabs { display: flex; flex-wrap: nowrap; gap: 24px; margin: 16px 0 12px; border-bottom: 1px solid var(--music-line); }
-.music-app .library-tabs button { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 4px; min-height: 46px; padding: 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--music-muted); font-size: 13px; white-space: nowrap; }
-.music-app .library-tabs button[aria-pressed="true"] { border-bottom-color: var(--music-accent); color: var(--music-text); }
+.music-app .radar-heading h2 { margin: 0; color: var(--music-text); font-size: 24px; font-weight: 550; line-height: 1.4; }
 .music-app .unread-count { min-width: 16px; height: 16px; margin-left: 4px; padding: 0 4px; background: var(--music-accent-soft); color: var(--music-accent-text); font: 500 10px/1 "Segoe UI",sans-serif; }
-.music-app .received-songs { display: block; }
-.music-app .received-date-group { margin: 20px 0 4px; color: var(--music-muted); font-size: 12px; font-weight: 400; }
-.music-app .received-date-group:first-child { margin-top: 6px; }
-.music-app .received-song-item { padding: 0; border: 0; border-bottom: 1px solid var(--music-line); border-radius: 0; background: none; }
-.music-app .received-song-item[data-unread="true"] { border-color: var(--music-line); }
-.music-app .received-song-open { min-height: 72px; padding: 10px 6px; gap: 14px; border-radius: 5px; }
-.music-app .saved-track:hover { background: var(--music-hover); }
-.music-app .saved-track strong { color: var(--music-text); font-size: 14px; font-weight: 500; line-height: 1.45; }
-.music-app .saved-track small { color: var(--music-muted); font-size: 12px; line-height: 1.5; }
-.music-app .saved-track > svg { color: var(--music-muted); }
-.music-app .received-row-meta { flex: 0 0 auto; width: 52px; text-align: right; gap: 5px; color: var(--music-muted); font-size: 11px; }
-.music-app .received-unread { color: var(--music-accent); font-size: 10px; }
-.music-app .received-unread::before { width: 4px; height: 4px; margin-right: 5px; }
-.music-app .received-song-detail { margin: 0 0 14px 68px; padding: 0; border: 0; }
-.music-app .received-song-detail p { margin: 0 0 10px; color: var(--music-muted); font-size: 12px; }
-.music-app .received-song-detail .room-secondary { min-height: 38px; padding: 6px 12px; border-color: var(--music-line); color: var(--music-text); font-size: 12px; }
-.music-app .journey-events { margin-top: 10px; }
-.music-app .journey-event { padding: 12px 0; border-color: var(--music-line); }
-.music-app .journey-event__meta { color: var(--music-muted); }
-.music-app .saved-track { border-radius: 5px; }
-.music-app .saved-track-row { border-color: var(--music-line); padding: 4px 0; }
-.music-app .saved-track-row .saved-track { min-height: 72px; }
-.music-app .journey-return, .music-app .journey-disclaimer { display: none; }
-.music-app .library-empty { min-height: 240px; align-content: center; border: 0; background: none; }
-.music-app .library-empty > svg { color: var(--music-muted); }
-.music-app .library-empty p { color: var(--music-muted); }
 .music-app .album-tile, .room-page:not(.music-app) .album-tile { border: 0; border-radius: 4px; box-shadow: none; background: #2b3032; color: var(--music-muted); }
 .music-app .album-tile__ring, .room-page:not(.music-app) .album-tile__ring { display: none; }
-.music-app .saved-track .album-tile { width: 48px; height: 48px; }
 .music-app .listening-art > .album-tile { animation: none; border-radius: 6px; }
 .music-app .radar-heading { margin-bottom: 24px; align-items: flex-start; }
 .music-app .scene-bar__count { color: var(--music-muted); font-size: 12px; }
@@ -97,20 +60,12 @@
 .music-app[data-authenticated="false"] .plugin-debug[open] { width: auto; max-height: none; overflow: visible; background: var(--music-surface); box-shadow: none; }
 @media (min-width: 760px) {
   .music-app .screen-view { padding: 26px 44px 40px; }
-  .music-app .received-song-open { min-height: 72px; }
 }
 @media (max-width: 520px) {
   .music-app .phone-stage .bottom-nav { min-height: 48px; gap: 24px; padding-inline: 20px; }
   .music-app .bottom-nav > button { min-height: 48px; }
   .music-app .screen-view, .music-app .radar-home { padding: 24px 20px 32px; }
-  .music-app .journey-header h2, .music-app .radar-heading h2 { font-size: 23px; }
-  .music-app .library-tabs { justify-content: space-between; gap: 12px; margin-top: 20px; }
-  .music-app .library-tabs button { font-size: 12px; }
-  .music-app .stat-grid { gap: 14px; }
-  .music-app .stat-grid span { font-size: 11px; }
-  .music-app .received-song-open { gap: 12px; min-height: 76px; padding-inline: 0; }
-  .music-app .saved-track strong { font-size: 13px; }
-  .music-app .received-row-meta { width: 42px; font-size: 10px; }
+  .music-app .radar-heading h2 { font-size: 23px; }
   .music-app .plugin-debug { top: 7px; right: 118px; }
   .music-app .integrated-presence, .music-app .integrated-invite-notice, .music-app .demo-reply-reminder { padding-inline: 20px; }
 }
