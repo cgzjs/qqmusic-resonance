@@ -1,9 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import { audioTracks } from "../lib/resonance/demo-data";
 import { catalogVersion, findCatalogTrack } from "../lib/resonance/catalog";
-import { deliverExchange, transitionExchange, type ExchangeCommand, type ExchangeOutbox } from "../lib/resonance/exchange-protocol";
+import { deliverExchange, sendGift, type ExchangeCommand, type ExchangeOutbox } from "../lib/resonance/exchange-protocol";
 import { REACTION_COOLDOWN_MS, REACTION_TTL_MS, type RoomReaction } from "../lib/resonance/room-protocol";
-import { applyRoomCommand, HEARTBEAT_TIMEOUT_MS, parseRoomMessage, playbackPosition, settledPlayback, RECONNECT_GRACE_MS, ROOM_LIFETIME_MS, type RoomRole, type RoomSnapshot } from "../lib/resonance/room-protocol";
+import { applyRoomCommand, HEARTBEAT_TIMEOUT_MS, isRoomExchange, parseRoomMessage, playbackPosition, settledPlayback, RECONNECT_GRACE_MS, ROOM_LIFETIME_MS, type RoomRole, type RoomSnapshot } from "../lib/resonance/room-protocol";
 
 const durations = Object.fromEntries(audioTracks.map(track => [track.id, track.duration]));
 type PeerSlot = { clientId: string | null; disconnectedAt: number | null };
@@ -34,6 +34,8 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
         await this.closeRoom(); return;
       }
       if (this.room && !this.room.catalogVersion) { this.room.catalogVersion = catalogVersion; await this.persist(); }
+      // 旧版双向交换里没完成的（等回应、已婉拒等）不再有意义，直接清掉。
+      if (this.room?.exchange && !isRoomExchange(this.room.exchange)) { this.room.exchange = null; this.room.revision++; await this.persist(); }
       // Hibernation preserves sockets; a process restart may not. Reserve lost
       // seats rather than allowing another client to take over immediately.
       let lostConnection = false;
@@ -79,7 +81,6 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
     }
     const deadlines = [this.room.expiresAt];
     deadlines.push(...deliveries);
-    if (this.room.exchange?.status === "pending") deadlines.push(this.room.exchange.expiresAt);
     for (const slot of Object.values(this.room.slots)) if (slot.disconnectedAt !== null) deadlines.push(slot.disconnectedAt + RECONNECT_GRACE_MS);
     for (const socket of this.ctx.getWebSockets()) {
       if (socket.readyState !== 1) continue;
@@ -94,7 +95,6 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
   }
   private async closeRoom() {
     if (!this.room || this.room.closed) return;
-    if (this.room.exchange?.status === "pending") this.room.exchange.status = "ended";
     this.room.closed = true; this.room.revision++; this.pausePlayback(); this.broadcast();
     for (const socket of this.ctx.getWebSockets()) {
       socket.serializeAttachment(null);
@@ -106,13 +106,6 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
 
   private async clearRoomStorage() {
     await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.room = null;
-  }
-
-  private expireExchange() {
-    if (this.room?.exchange?.status === "pending" && Date.now() >= this.room.exchange.expiresAt) {
-      this.room.exchange.status = "expired"; this.room.revision++; return true;
-    }
-    return false;
   }
 
   private async flushExchangeOutbox() {
@@ -146,12 +139,12 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
     if (audioTracks.length < 2) { reply("EXCHANGE_CATALOG_UNAVAILABLE"); return; }
     const cached = room.exchangeCommands?.find(item => item.command.id === command.id);
     if (cached) { reply(cached.role === role && JSON.stringify(cached.command) === JSON.stringify(command) ? undefined : "EXCHANGE_CONFLICT"); return; }
-    if (command.action === "offer" && (room.exchangeIds?.includes(command.id) || (room.exchangeIds?.length ?? 0) >= 100 || (room.exchangeOutbox?.length ?? 0) >= 10)) { reply("EXCHANGE_LIMIT"); return; }
-    const result = transitionExchange(room.exchange ?? null, role, command, Date.now(), this.peers("host").length > 0 && this.peers("guest").length > 0, audioTracks.map(track => track.id));
+    if (room.exchangeIds?.includes(command.id) || (room.exchangeIds?.length ?? 0) >= 100 || (room.exchangeOutbox?.length ?? 0) >= 10) { reply("EXCHANGE_LIMIT"); return; }
+    const result = sendGift(role, command, Date.now(), this.peers("host").length > 0 && this.peers("guest").length > 0, audioTracks.map(track => track.id));
     if (result.error) { reply(result.error); return; }
     room.exchange = result.exchange!;
-    if (command.action === "offer") room.exchangeIds = [...(room.exchangeIds ?? []), command.id];
-    if (room.exchange.status === "completed") room.exchangeOutbox = [...(room.exchangeOutbox ?? []), { exchange: { ...room.exchange, saved: { ...room.exchange.saved } }, accounts: { ...room.accounts }, saved: { host: false, guest: false }, attempts: 0, nextAttemptAt: Date.now() }];
+    room.exchangeIds = [...(room.exchangeIds ?? []), command.id];
+    room.exchangeOutbox = [...(room.exchangeOutbox ?? []), { exchange: { ...room.exchange, saved: { ...room.exchange.saved } }, accounts: { ...room.accounts }, saved: { host: false, guest: false }, attempts: 0, nextAttemptAt: Date.now() }];
     room.exchangeCommands = [...(room.exchangeCommands ?? []), { role, command }].slice(-128);
     room.revision++;
     await this.persist();
@@ -213,7 +206,6 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
       data.accountToken = accountToken;
     }
     const now = Date.now();
-    if (this.expireExchange()) { await this.persist(); this.broadcast(); }
     if (!this.room || this.room.closed || Date.now() >= this.room.expiresAt) { await this.closeRoom(); return; }
     data.lastSeen = now;
     if (!data.role) {
@@ -241,7 +233,7 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
     if (message.type === "exchange") {
       const otherRole = data.role === "host" ? "guest" : "host";
       const other = this.peers(otherRole)[0];
-      if (this.room.accounts && other && ["offer", "respond"].includes(message.action)) {
+      if (this.room.accounts && other) {
         const before = this.room;
         const valid = await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName(before.accounts![otherRole])).fetch(new Request("https://account.internal/auth", { headers: { "X-Account-Token": this.attachment(other)?.accountToken ?? "" } }));
         if (this.room !== before || !this.room || this.room.closed || socket.readyState !== 1) return;
@@ -315,7 +307,6 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
     await this.flushExchangeOutbox();
     if (!this.room) return;
     if (this.room.closed) { await this.scheduleAlarm(); return; }
-    if (this.expireExchange()) { await this.persist(); this.broadcast(); }
     const now = Date.now();
     if (now >= this.room.expiresAt || (this.room.slots.host.disconnectedAt !== null && now - this.room.slots.host.disconnectedAt >= RECONNECT_GRACE_MS)) { await this.closeRoom(); return; }
     for (const socket of this.ctx.getWebSockets()) {

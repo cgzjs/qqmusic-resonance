@@ -15,7 +15,7 @@ type ListeningSessionProps = {
   player: ResonancePlayer;
   reaction: ReactionDelivery | null;
   isFavorite: boolean;
-  onReact: (reaction: "wave" | "heart") => void;
+  onReact: (reaction: "heart") => void;
   onToggleFavorite: () => void;
   onBack: () => void;
   onExchange: () => void;

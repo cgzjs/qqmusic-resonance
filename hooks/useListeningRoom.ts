@@ -70,7 +70,7 @@ export function useListeningRoom(roomId: string) {
     incomingDeadline.current = null; setIncomingReaction(null);
     settleReaction("failed", "CONNECTION_LOST");
     if (exchangeTimer.current) clearTimeout(exchangeTimer.current);
-    if (exchangeCommandRef.current) { setExchangeRequest("uncertain"); setExchangeError("连接断开，操作结果待确认"); }
+    if (exchangeCommandRef.current) { setExchangeRequest("uncertain"); setExchangeError("连接断开，不确定是否已送出"); }
   }, [settleReaction]);
 
   const clearTimers = useCallback(() => {
@@ -132,8 +132,8 @@ export function useListeningRoom(roomId: string) {
           if (message.type === "exchange-result" && message.requestId === exchangeCommandRef.current?.id) {
             if (exchangeTimer.current) clearTimeout(exchangeTimer.current);
             exchangeTimer.current = null; exchangeCommandRef.current = null; setExchangeRequest("idle");
-            const reasons: Record<string, string> = { EXCHANGE_BUSY: "TA 已送来一首，先回应吧", EXCHANGE_STALE: "操作已过期，请重试", EXCHANGE_FINISHED: "交换已结束", EXCHANGE_FORBIDDEN: "等 TA 回应，或撤回这首", EXCHANGE_INVALID_REPLY: "换一首不一样的歌", EXCHANGE_CONFLICT: "操作失败，请重试", EXCHANGE_LIMIT: "交换次数已用完，或上次还在保存", PEER_OFFLINE: "TA 暂时掉线了", EXCHANGE_ACCOUNT_REQUIRED: "请先从附近跟 TA 一起听", INVALID_TRACK: "这首歌暂不可交换。", RATE_LIMIT: "太快啦，稍等再试" };
-            setExchangeError(message.error ? reasons[message.error] ?? "交换失败，请重试" : null);
+            const reasons: Record<string, string> = { EXCHANGE_STALE: "没送出去，请重试", EXCHANGE_CONFLICT: "没送出去，请重试", EXCHANGE_LIMIT: "这次一起听送得够多啦，或上一首还在保存", PEER_OFFLINE: "TA 暂时掉线了", EXCHANGE_ACCOUNT_REQUIRED: "请先从附近跟 TA 一起听", INVALID_TRACK: "这首歌暂时送不了", RATE_LIMIT: "太快啦，稍等再试" };
+            setExchangeError(message.error ? reasons[message.error] ?? "没送出去，请重试" : null);
           }
           if (message.type === "reaction-status" && message.id === outgoingRef.current?.id && ["sent", "received", "failed"].includes(message.status)) {
             settleReaction(message.status, typeof message.error === "string" ? message.error : undefined); return;
@@ -141,7 +141,7 @@ export function useListeningRoom(roomId: string) {
           if (message.type === "reaction") {
             if (!isSynchronized()) return;
             const item = message.event as RoomReaction | undefined;
-            if (!roleRef.current || !item || !UUID_PATTERN.test(item.id ?? "") || !["wave", "heart"].includes(item.kind) || !["host", "guest"].includes(item.from) || item.from === roleRef.current || !Number.isFinite(item.createdAt) || typeof item.trackId !== "string" || !Number.isFinite(message.serverTime) || message.serverTime - item.createdAt > REACTION_TTL_MS || message.serverTime < item.createdAt) return;
+            if (!roleRef.current || !item || !UUID_PATTERN.test(item.id ?? "") || item.kind !== "heart" || !["host", "guest"].includes(item.from) || item.from === roleRef.current || !Number.isFinite(item.createdAt) || typeof item.trackId !== "string" || !Number.isFinite(message.serverTime) || message.serverTime - item.createdAt > REACTION_TTL_MS || message.serverTime < item.createdAt) return;
             if (Date.now() + serverOffsetRef.current - item.createdAt > REACTION_TTL_MS) return;
             if (!seenReactions.current.has(item.id)) {
               seenReactions.current.add(item.id);
@@ -293,9 +293,10 @@ export function useListeningRoom(roomId: string) {
     exchangeTimer.current = setTimeout(() => { setExchangeRequest("uncertain"); setExchangeError("送达未确认，可重试，不会重复送出"); }, 8000);
     socketRef.current.send(JSON.stringify(command));
   }, [isSynchronized]);
-  const sendExchange = useCallback((action: ExchangeCommand["action"], values: { exchangeId?: string; trackId?: string } = {}) => {
+  // 送 TA 一首：一次只送一首，送出即完成。
+  const sendExchange = useCallback((trackId: string) => {
     if (exchangeCommandRef.current) return;
-    transmitExchange({ type: "exchange", id: crypto.randomUUID(), action, sentAt: Date.now() + serverOffsetRef.current, ...values });
+    transmitExchange({ type: "exchange", id: crypto.randomUUID(), action: "offer", sentAt: Date.now() + serverOffsetRef.current, trackId });
   }, [transmitExchange]);
   const retryExchange = useCallback(() => { if (exchangeCommandRef.current) transmitExchange(exchangeCommandRef.current); }, [transmitExchange]);
 

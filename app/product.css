@@ -41,7 +41,7 @@
 .music-app .room-secondary, .music-app .secondary-action { min-height: 42px; border-color: var(--music-line); border-radius: 5px; color: var(--music-text); background: none; }
 .music-app .radar-wrap { max-width: 380px; margin-inline: auto; }
 .music-app .section-kicker { color: var(--music-accent-text); }
-.music-app .integrated-presence, .music-app .integrated-invite-notice, .music-app .demo-reply-reminder { margin: 0; width: 100%; min-height: 42px; padding: 10px 28px; border: 0; border-radius: 0; background: var(--music-accent-soft); color: var(--music-accent-text); }
+.music-app .integrated-presence, .music-app .demo-reply-reminder { margin: 0; width: 100%; min-height: 42px; padding: 10px 28px; border: 0; border-radius: 0; background: var(--music-accent-soft); color: var(--music-accent-text); }
 .music-app .demo-reply-reminder .interaction-glyph { width: 18px; height: 18px; }
 .music-app .reaction-dock, .music-app .recommend-note, .music-app .privacy-line { border-color: var(--music-line); border-radius: 6px; background: var(--music-hover); }
 .music-app .plugin-debug { position: absolute; top: 10px; right: 142px; z-index: 35; margin: 0; padding: 0; border: 0; color: var(--music-muted); font-size: 12px; }
@@ -66,5 +66,5 @@
   .music-app .screen-view, .music-app .radar-home { padding: 24px 20px 32px; }
   .music-app .radar-heading h2 { font-size: 23px; }
   .music-app .plugin-debug { top: 7px; right: 118px; }
-  .music-app .integrated-presence, .music-app .integrated-invite-notice, .music-app .demo-reply-reminder { padding-inline: 20px; }
+  .music-app .integrated-presence, .music-app .demo-reply-reminder { padding-inline: 20px; }
 }

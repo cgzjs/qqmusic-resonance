@@ -92,7 +92,7 @@ test("foreground resume pauses synchronously; old queued state cannot release au
   assert.equal(player.status, "paused");
   assert.equal(current.connection, "reconnecting");
   const count = socket.sent.length;
-  await act(async () => { current.command("play"); current.sendReaction("heart"); current.sendExchange("offer", { trackId: audioTracks[0].id }); });
+  await act(async () => { current.command("play"); current.sendReaction("heart"); current.sendExchange(audioTracks[0].id); });
   assert.equal(socket.sent.length, count);
   await act(async () => socket.message({ type: "state", room: room(), serverTime: Date.now() }));
   assert.equal(player.status, "paused");
@@ -103,7 +103,7 @@ test("foreground resume pauses synchronously; old queued state cannot release au
 
 test("offline pauses audio, exchange is not replayed; explicit retry retains its request id", async () => {
   await mount(); const first = await welcome();
-  await act(async () => current.sendExchange("offer", { trackId: audioTracks[0].id }));
+  await act(async () => current.sendExchange(audioTracks[0].id));
   const command = first.sent.at(-1);
   await network(false);
   assert.equal(player.status, "paused"); assert.equal(current.exchangeRequest, "uncertain");
@@ -147,7 +147,7 @@ test("long browser suspension rejects the old socket and resynchronizes paused p
 
 test("expired room clears unresolved exchange and does not resurrect on pageshow", async () => {
   await mount(); await welcome();
-  await act(async () => current.sendExchange("offer", { trackId: audioTracks[0].id }));
+  await act(async () => current.sendExchange(audioTracks[0].id));
   await network(false); respond = async () => response({}, 404);
   await network(true);
   assert.equal(current.connection, "closed"); assert.equal(current.exchangeRequest, "idle");
@@ -278,7 +278,7 @@ test("server-backed reaction survives remount and only notifies the claimed resp
   } };
   function Harness() { current = useDemoReplies(reply => replies.push(reply)); return null; }
   await act(async () => root.render(React.createElement(Harness)));
-  await act(async () => current.sendReaction("wave", audioTracks[0].id));
+  await act(async () => current.sendReaction("heart", audioTracks[0].id));
   await act(async () => current.sendReaction("heart", audioTracks[1].id));
   assert.equal(queued, 1); assert.equal(current.reaction.status, "sent");
   await act(async () => root.render(null));
@@ -397,19 +397,18 @@ test("followed listener is told once who joined; the follower gets no toast", as
   assert.equal(recoveryTest.toasts.length, 1);
 });
 
-test("room recipient gets offer toast; sender does not; completion notifies without heartbeat duplicates", async () => {
-  const offered = { id: token, from: "host", status: "pending", offeredTrackId: audioTracks[0].id, createdAt: Date.now(), expiresAt: Date.now() + 60000, saved: {host:false,guest:false} };
+test("room gift toasts only the recipient, once per gift", async () => {
+  const gift = { id: token, from: "host", status: "completed", offeredTrackId: audioTracks[0].id, createdAt: Date.now(), completedAt: Date.now(), saved: {host:false,guest:false} };
   function Harness({ state, role }) { useRoomExchangeNotification(state, role, true); return null; }
-  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: offered }), role: "host" })));
+  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: gift }), role: "host" })));
   assert.equal(recoveryTest.toasts.length, 0);
-  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: offered }), role: "guest" })));
-  assert.equal(recoveryTest.toasts.length, 1); assert.equal(recoveryTest.toasts[0].title, "TA 送来一首歌");
-  await act(async () => root.render(React.createElement(Harness, { state: room({ revision: 2, exchange: { ...offered } }), role: "guest" })));
+  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: gift }), role: "guest" })));
+  assert.equal(recoveryTest.toasts.length, 1); assert.equal(recoveryTest.toasts[0].title, "TA 送你一首歌");
+  assert.equal(recoveryTest.toasts[0].description, `《${audioTracks[0].track}》`);
+  await act(async () => root.render(React.createElement(Harness, { state: room({ revision: 2, exchange: { ...gift, saved: {host:true,guest:true} } }), role: "guest" })));
   assert.equal(recoveryTest.toasts.length, 1);
-  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: { ...offered, status: "completed", responseTrackId: audioTracks[1].id } }), role: "guest" })));
-  assert.equal(recoveryTest.toasts.length, 2);
-  assert.equal(recoveryTest.toasts[1].description, `《${audioTracks[0].track}》`);
-  assert.ok(recoveryTest.dismissedToasts.includes(recoveryTest.toasts[0].id));
+  await act(async () => root.render(React.createElement(Harness, { state: room({ revision: 3, exchange: { ...gift, id: crypto.randomUUID(), offeredTrackId: audioTracks[1].id } }), role: "guest" })));
+  assert.equal(recoveryTest.toasts.length, 2); assert.equal(recoveryTest.toasts[1].description, `《${audioTracks[1].track}》`);
 });
 
 test("current playback bar keeps paused song changes paused, wraps tracks and plays playlist choices", async () => {
@@ -516,16 +515,16 @@ test("avatar gestures identify the sender, never turn delivery acknowledgement i
   let outgoing = null, incoming = null;
   const render = () => act(async () => root.render(React.createElement(ListeningArtwork, { track, mode: 'online', role: 'guest', outgoing, incoming })));
   await render();
-  outgoing = { id: 'hello-self', kind: 'wave', trackId: track.id, status: 'sending' }; await render();
-  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'wave');
+  outgoing = { id: 'hello-self', kind: 'heart', trackId: track.id, status: 'sending' }; await render();
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'heart');
   const face = document.querySelector('[data-person="self"] .listener-avatar-face');
   outgoing = { ...outgoing, status: 'received' }; await render();
   assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face'), face, 'acknowledgement does not restart the sender animation');
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
-  incoming = { id: 'hello-other-song', from: 'host', kind: 'wave', trackId: audioTracks[1].id, createdAt: Date.now() }; await render();
+  incoming = { id: 'hello-other-song', from: 'host', kind: 'heart', trackId: audioTracks[1].id, createdAt: Date.now() }; await render();
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
   incoming = { ...incoming, id: 'hello-peer', trackId: track.id }; await render();
-  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'wave');
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'heart');
   incoming = { ...incoming, id: 'wrong-sender', from: 'guest' }; await render();
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
   outgoing = { ...outgoing, status: 'failed' }; await render();
@@ -534,15 +533,15 @@ test("avatar gestures identify the sender, never turn delivery acknowledgement i
 
 test("demo avatars wait for the saved reply; historical reactions do not replay when entering the view", async () => {
   const track = audioTracks[0];
-  let outgoing = { id: 'old', kind: 'wave', trackId: track.id, status: 'received' };
+  let outgoing = { id: 'old', kind: 'heart', trackId: track.id, status: 'received' };
   const render = () => act(async () => root.render(React.createElement(ListeningArtwork, { track, mode: 'demo', outgoing })));
   await render();
   assert.equal(document.querySelectorAll('[data-gesture]').length, 0);
   outgoing = { ...outgoing, id: 'new', status: 'sent' }; await render();
-  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'wave');
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'heart');
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
   outgoing = { ...outgoing, status: 'received' }; await render();
-  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'wave');
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'heart');
   await act(async () => new Promise(resolve => setTimeout(resolve, 2700)));
   assert.equal(document.querySelectorAll('[data-gesture]').length, 0, 'completed gestures cannot replay when quiet mode is changed');
 });

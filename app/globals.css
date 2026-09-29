@@ -519,7 +519,7 @@ fieldset.song-list { margin: 0; padding: 0; border: 0; }
 .reaction-flight[data-kind="heart"] .interaction-glyph { animation: reaction-heart 600ms 200ms ease-out both; }
 .reaction-spark { position: absolute; width: 6px; height: 6px; border: 1px solid #6feee1; top: -3px; right: -5px; animation: reaction-spark 750ms 200ms both; }
 .reaction-spark--two { top: auto; right: auto; bottom: -2px; left: -7px; animation-delay: 300ms; }
-.reaction-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 4px; }
+.reaction-actions { display: grid; grid-template-columns: minmax(0,1fr); gap: 10px; margin-top: 4px; }
 .reaction-action { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 54px; padding: 8px; border: 1px solid #6feee144; border-radius: 8px; color: #d7e4dd; font-size: 13px; background: #15201a; transition: border-color 160ms,background 160ms; cursor: pointer; }
 .reaction-action:hover:not(:disabled), .reaction-action:focus-visible { border-color: #6feee1; background: #1c3028; }
 .reaction-action:hover:not(:disabled) .interaction-glyph { transform: rotate(-9deg); }
@@ -580,8 +580,6 @@ fieldset.song-list { margin: 0; padding: 0; border: 0; }
 .radar-source-tabs { display: flex; gap: 12px; padding: 0 24px; border-bottom: 1px solid #354340; }
 .radar-source-tabs button { flex: 1; min-height: 48px; font-size: 14px; color: #a4b8ae; border-bottom: 2px solid transparent; }
 .radar-source-tabs button[aria-pressed="true"] { border-bottom-color: #6feee1; color: #6feee1; }
-.integrated-invite-notice { display: flex; align-items: center; gap: 10px; margin: 8px 24px; padding: 12px; min-height: 48px; border: 1px solid #6feee177; color: #6feee1; font-size: 13px; border-radius: 6px; text-align: left; }
-.integrated-invite-notice > span:last-child { margin-left: auto; white-space: nowrap; }
 .integrated-presence { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 24px; color: #a4b8ae; font-size: 12px; }
 .integrated-presence button { min-height: 44px; color: #6feee1; }
 .integrated-error { margin: 12px 24px; }

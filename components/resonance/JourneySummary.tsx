@@ -1,13 +1,13 @@
 "use client";
 
 import { Fragment, useState, type CSSProperties } from "react";
-import { ArrowLeftRight, Clock3, Headphones, Heart, Play, Radar, Radio, X, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Clock3, Gift, Headphones, Heart, Play, Radar, Radio, X, type LucideIcon } from "lucide-react";
 import { AlbumTile } from "@/components/resonance/AlbumTile";
 import { sceneLabels } from "@/lib/resonance/demo-data";
 import type { AudioTrack, MusicLibrary } from "@/lib/resonance/types";
 import { findCatalogTrack } from "@/lib/resonance/catalog";
 import type { OnlineExchangeRecord } from "@/lib/resonance/exchange-protocol";
-import { receivedSongs, exchangesOnDay, type ReceivedSong } from "@/lib/resonance/received-songs";
+import { exchangesOnDay, type ReceivedSong } from "@/lib/resonance/received-songs";
 import { ReceivedSongs, clockTime, dayLabel } from "./ReceivedSongs";
 
 export type JourneyTab = "history" | "received" | "favorites" | "later";
@@ -41,20 +41,20 @@ export function JourneySummary({ library, onPlayTrack, onRemoveFavorite, onRemov
   const [limit, setLimit] = useState(20);
   const today = new Date().toDateString();
   const todayEvents = library.events.filter(event => new Date(event.createdAt).toDateString() === today);
-  const completedExchanges = receivedSongs({ events: library.events, onlineExchanges, readExchangeIds: [] });
-  const stats = [
-    { label: "今日遇见", value: new Set(todayEvents.filter(event => event.type === "discover").map(event => event.listenerId)).size },
-    { label: "今日交换", value: exchangesOnDay(completedExchanges) },
-    { label: "我的收藏", value: library.favoriteIds.length },
-  ];
   const ids = tab === "favorites" ? library.favoriteIds : library.listenLaterIds;
+  // 一起听时的送歌是单向的：gift 标出是送给 TA 还是 TA 送的；旧版交换两首都有，按一对显示。
   const history = [...new Map([
-    ...onlineExchanges.map(event => ({ id: `online:${event.roomId}:${event.id}`, type: "exchange" as const, trackId: event.sentTrackId, listenerId: "", scene: null, createdAt: new Date(event.completedAt).toISOString(), receivedTrackId: event.receivedTrackId, origin: "online-exchange" as const })),
+    ...onlineExchanges.filter(event => event.sentTrackId || event.receivedTrackId).map(event => ({ id: `online:${event.roomId}:${event.id}`, type: "exchange" as const, trackId: (event.sentTrackId ?? event.receivedTrackId)!, listenerId: "", scene: null, createdAt: new Date(event.completedAt).toISOString(), receivedTrackId: event.sentTrackId ? event.receivedTrackId : undefined, gift: !event.sentTrackId ? "received" as const : !event.receivedTrackId ? "sent" as const : undefined, origin: "online-exchange" as const })),
     ...library.events.filter(event => event.type !== "exchange" || event.receivedTrackId).map(event => ({ ...event, id: `demo:${event.id}`, origin: "demo" as const })),
     ...onlineHistory.map(event => ({ id: `listen:${event.id}`, type: "listen" as const, trackId: event.trackId, listenerId: "", scene: null, createdAt: new Date(event.listenedAt).toISOString(), receivedTrackId: undefined, origin: "online" as const })),
   ].map(event => [event.id, event])).values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const stats = [
+    { label: "今日遇见", value: new Set(todayEvents.filter(event => event.type === "discover").map(event => event.listenerId)).size },
+    { label: "今日交换", value: exchangesOnDay(history.filter(event => event.type === "exchange").map(event => ({ receivedAt: Date.parse(event.createdAt) }))) },
+    { label: "我的收藏", value: library.favoriteIds.length },
+  ];
   // 今天经过的歌（交换取收到的那首），叠成一摞唱片放在页首。
-  const todayCovers = [...new Map(history.filter(event => new Date(event.createdAt).toDateString() === today).map(event => findCatalogTrack(event.type === "exchange" ? event.receivedTrackId : event.trackId)).filter(track => track !== undefined).map(track => [track.id, track])).values()].slice(0, 4);
+  const todayCovers = [...new Map(history.filter(event => new Date(event.createdAt).toDateString() === today).map(event => findCatalogTrack(event.receivedTrackId ?? event.trackId)).filter(track => track !== undefined).map(track => [track.id, track])).values()].slice(0, 4);
   const tabs = [
     { id: "history", label: "足迹", count: 0 },
     { id: "received", label: "收到的歌", count: unread },
@@ -87,15 +87,16 @@ export function JourneySummary({ library, onPlayTrack, onRemoveFavorite, onRemov
           : tab === "history" ? history.length === 0
             ? <div className="tp-empty"><Radar aria-hidden="true" /><h3>还没有音乐足迹</h3><p>去附近发现一首歌，记录会从这里开始。</p>{onReturn && <button type="button" className="tp-btn tp-btn--quiet" onClick={onReturn}>去附近看看</button>}</div>
             : <div className="tp-timeline">{shown.map((event, index) => {
-              const exchange = event.type === "exchange";
-              const track = findCatalogTrack(exchange ? event.receivedTrackId! : event.trackId);
+              const gift = "gift" in event ? event.gift : undefined;
+              const exchange = event.type === "exchange" && !!event.receivedTrackId;
+              const track = findCatalogTrack(event.receivedTrackId ?? event.trackId);
               const sent = findCatalogTrack(event.trackId);
               const date = new Date(event.createdAt);
               const newDay = index === 0 || date.toDateString() !== new Date(shown[index - 1].createdAt).toDateString();
               const kind = event.origin === "online" ? "online" : event.type;
-              const Icon = eventIcons[kind];
+              const Icon = gift ? Gift : eventIcons[kind];
               const verb = eventVerbs[event.type];
-              const what = event.origin === "online-exchange" ? "一起听时交换" : event.origin === "online" ? "和 TA 一起听" : event.scene ? `在${sceneLabels[event.scene]}${verb}` : verb;
+              const what = gift === "sent" ? "一起听时送给 TA" : gift === "received" ? "一起听时 TA 送你" : event.origin === "online-exchange" ? "一起听时交换" : event.origin === "online" ? "和 TA 一起听" : event.scene ? `在${sceneLabels[event.scene]}${verb}` : verb;
               return <Fragment key={event.id}>{newDay && <h3 className="tp-day">{dayLabel(date)}</h3>}<article className="journey-event tp-event" data-kind={kind}>
                 <span className="tp-node" aria-hidden="true"><Icon size={14} strokeWidth={2} /></span>
                 <p className="tp-event-meta"><span>{what}</span><time dateTime={event.createdAt}>{clockTime(date)}</time></p>
@@ -107,7 +108,7 @@ export function JourneySummary({ library, onPlayTrack, onRemoveFavorite, onRemov
               </article></Fragment>;
             })}{history.length > limit && <button type="button" className="tp-btn tp-btn--quiet tp-more" onClick={() => setLimit(value => value + 20)}>显示更多记录</button>}</div>
           : ids.length === 0
-            ? <div className="tp-empty">{tab === "favorites" ? <Heart aria-hidden="true" /> : <Clock3 aria-hidden="true" />}<h3>{tab === "favorites" ? "还没有收藏" : "待听列表为空"}</h3><p>{tab === "favorites" ? "试听时收藏，或留住交换收到的歌。" : "收到歌曲时，可以先加入稍后再听。"}</p></div>
+            ? <div className="tp-empty">{tab === "favorites" ? <Heart aria-hidden="true" /> : <Clock3 aria-hidden="true" />}<h3>{tab === "favorites" ? "还没有收藏" : "待听列表为空"}</h3><p>{tab === "favorites" ? "试听时收藏，或留住 TA 送你的歌" : "收到歌曲时，可以先加入稍后再听"}</p></div>
             : tab === "favorites"
               ? <ul className="tp-wall">{ids.map(id => {
                 const track = findCatalogTrack(id);

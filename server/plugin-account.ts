@@ -8,6 +8,9 @@ import { receivedSongs } from "../lib/resonance/received-songs";
 import type { DemoReply } from "../lib/resonance/demo-reply";
 import { DEMO_RESPONSE_MS } from "../lib/resonance/demo-motion";
 type RecordData = { accountId: string; displayName: string; deviceHash: string; sessions: { hash: string; expiresAt: number }[]; data: AccountData };
+const slug = (value: unknown) => typeof value === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+// 送 TA 一首是单向的：一方只记送出、另一方只记收到；旧版交换两边都有，且不能是同一首。
+const validGift = (sent: unknown, received: unknown) => (sent === undefined || slug(sent)) && (received === undefined || slug(received)) && (sent !== undefined || received !== undefined) && sent !== received;
 const digest = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))).map(byte => byte.toString(16).padStart(2, "0")).join("");
 
 export class PluginAccount extends DurableObject<Cloudflare.Env> {
@@ -66,10 +69,10 @@ export class PluginAccount extends DurableObject<Cloudflare.Env> {
       // /api/host allowlist never forwards record-exchange.
       if (action === "record-exchange" && request.method === "POST") {
         const item = body.record as OnlineExchangeRecord | undefined;
-        if (body.accountId !== this.record.accountId || !item || !UUID_PATTERN.test(item.id ?? "") || !UUID_PATTERN.test(item.roomId ?? "") || !Number.isFinite(item.completedAt) || typeof item.sentTrackId !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.sentTrackId) || typeof item.receivedTrackId !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.receivedTrackId) || item.sentTrackId === item.receivedTrackId) return reply({ error: "INVALID_EXCHANGE" }, 400);
+        if (body.accountId !== this.record.accountId || !item || !UUID_PATTERN.test(item.id ?? "") || !UUID_PATTERN.test(item.roomId ?? "") || !Number.isFinite(item.completedAt) || !validGift(item.sentTrackId, item.receivedTrackId)) return reply({ error: "INVALID_EXCHANGE" }, 400);
         const key = `exchange:${item.roomId}:${item.id}`;
         if (await this.ctx.storage.get(key)) return reply({ saved: true });
-        const record: OnlineExchangeRecord = { id: item.id, roomId: item.roomId, sentTrackId: item.sentTrackId, receivedTrackId: item.receivedTrackId, completedAt: item.completedAt };
+        const record: OnlineExchangeRecord = { id: item.id, roomId: item.roomId, ...(item.sentTrackId ? { sentTrackId: item.sentTrackId } : {}), ...(item.receivedTrackId ? { receivedTrackId: item.receivedTrackId } : {}), completedAt: item.completedAt };
         const next = { ...this.record, data: { ...this.record.data, onlineExchanges: [...this.record.data.onlineExchanges, record].slice(-100) } };
         await this.ctx.storage.transaction(async transaction => { await transaction.put("account", next); await transaction.put(key, true); });
         this.record = next;
@@ -101,9 +104,9 @@ export class PluginAccount extends DurableObject<Cloudflare.Env> {
           await this.ctx.storage.put("account", this.record);
           return reply({ claimed: true, reply: item, data: this.record.data });
         }
-        if (["queueExchange", "queueWave", "queueHeart"].includes(String(body.action))) {
+        if (["queueExchange", "queueHeart"].includes(String(body.action))) {
           if (typeof body.id !== "string" || !UUID_PATTERN.test(body.id) || typeof body.trackId !== "string") return reply({ error: "INVALID_REPLY" }, 400);
-          const kind: DemoReply["kind"] = body.action === "queueExchange" ? "exchange" : body.action === "queueWave" ? "wave" : "heart";
+          const kind: DemoReply["kind"] = body.action === "queueExchange" ? "exchange" : "heart";
           const signature = JSON.stringify([kind, body.trackId, kind === "exchange" ? body.event : null]);
           const key = `demo-reply:${body.id}`;
           const prior = await this.ctx.storage.get<string>(key);

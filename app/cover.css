@@ -118,8 +118,8 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-app .bottom-nav button span { font-size: 15px; font-weight: 500; }
 .tp-app .bottom-nav > button[data-active="true"] span { font-weight: 600; }
 .tp-app .unread-count { min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 999px; background: var(--cover-accent); color: var(--cover-base); font-family: inherit; font-size: 11px; font-weight: 700; line-height: 1; }
-.tp-app :is(.integrated-presence, .integrated-invite-notice, .demo-reply-reminder) { padding-inline: 16px; background: var(--cover-tone-soft); color: var(--cover-ink); }
-.tp-app :is(.integrated-invite-notice, .demo-reply-reminder) > span:last-child, .tp-app .integrated-presence button { color: var(--cover-accent); }
+.tp-app :is(.integrated-presence, .demo-reply-reminder) { padding-inline: 16px; background: var(--cover-tone-soft); color: var(--cover-ink); }
+.tp-app .demo-reply-reminder > span:last-child, .tp-app .integrated-presence button { color: var(--cover-accent); }
 .tp-app .phone-stage__content { scrollbar-color: var(--cover-line) transparent; }
 
 /* ============ 附近：雷达 ============ */
@@ -347,7 +347,6 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-room-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .tp-room-status[data-connected="true"] { color: var(--cover-accent); }
 .tp-room-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); scrollbar-color: var(--cover-line) transparent; }
-.tp-room .integrated-invite-notice { width: 100%; margin: 0 0 12px; border-radius: 12px; }
 .tp-room a.tp-btn { text-decoration: none; }
 .tp-room select:focus-visible { outline: 2px solid var(--cover-accent); outline-offset: 2px; }
 .tp-wide { display: flex; width: 100%; margin-top: 12px; }
@@ -412,6 +411,7 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-exchange-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; margin: -8px 0; }
 .tp-exchange-head > div { display: flex; align-items: center; gap: 8px; }
 .tp-exchange-head .interaction-glyph { width: 22px; height: 22px; }
+.tp-exchange-head svg { flex: none; color: var(--cover-accent); }
 .tp-exchange-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .tp-exchange-head .tp-icon-btn { margin-right: -10px; }
 .tp-exchange-lead { margin: 12px 0 16px; color: var(--cover-ink-2); font-size: 13px; }
@@ -421,11 +421,6 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-room .exchange-signal-sleeve .interaction-glyph { width: 24px; height: 24px; }
 .tp-room .exchange-signal-trail i { background: var(--cover-ink-3); }
 .tp-room .exchange-signal[data-sending="true"] .exchange-signal-trail i { animation-name: tp-dot; }
-.tp-exchange-offer { display: grid; justify-items: center; gap: 2px; text-align: center; }
-.tp-exchange-offer p { margin: 0; color: var(--cover-ink-3); font-size: 12px; }
-.tp-exchange-offer strong { font-size: 18px; font-weight: 700; }
-.tp-exchange-offer span { color: var(--cover-ink-2); font-size: 13px; }
-.tp-exchange-offer small { color: var(--cover-accent); font-size: 12px; font-variant-numeric: tabular-nums; }
 .tp-exchange-options { display: grid; gap: 4px; min-width: 0; margin: 16px 0 0; padding: 0; border: 0; }
 .tp-exchange-options legend { margin-bottom: 8px; padding: 0; color: var(--cover-ink-2); font-size: 13px; }
 .tp-exchange-options label { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 12px 6px 6px; border-radius: 12px; cursor: pointer; transition: background-color .2s var(--tp-ease); }

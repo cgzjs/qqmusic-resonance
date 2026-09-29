@@ -13,29 +13,25 @@ export function useFollowerNotification(ticket: SessionTicket | null) {
   }, [roomId, alias]);
 }
 
+// TA 送来一首时提醒一次；自己送出的由面板显示“已送给 TA”。
 export function useRoomExchangeNotification(room: RoomSnapshot | null, role: RoomRole | null, connected: boolean) {
-  const exchange = room?.exchange;
+  const gift = room?.exchange;
   const seen = useRef(new Set<string>());
   const roomId = room?.id, closed = room?.closed;
-  const id = exchange?.id, status = exchange?.status, from = exchange?.from;
-  const offered = exchange?.offeredTrackId, response = exchange?.responseTrackId;
+  const id = gift?.id, from = gift?.from, trackId = gift?.offeredTrackId;
   useEffect(() => {
-    if (!roomId || !id || !role || !connected || closed) return;
-    const incoming = status === "pending" && from !== role;
-    if (!incoming && status !== "completed") return;
-    const key = `${roomId}:${id}:${status}`;
+    if (!roomId || !id || !role || !connected || closed || from === role) return;
+    const key = `${roomId}:${id}`;
     if (seen.current.has(key)) return;
     seen.current.add(key);
-    const toastId = `room-exchange-${key}`;
-    const trackId = incoming || from !== role ? offered : response;
+    const toastId = `room-gift-${key}`;
     const track = audioTracks.find(item => item.id === trackId);
-    toast(incoming ? "TA 送来一首歌" : "交换成功，收到一首新歌", {
-      id: toastId, description: track ? `《${track.track}》` : "查看这次音乐交换", duration: incoming ? Infinity : 8000,
-      action: { label: incoming ? "回一首" : "查看回歌", onClick: () => {
+    toast("TA 送你一首歌", {
+      id: toastId, description: track ? `《${track.track}》` : undefined, duration: 6000,
+      action: { label: "看看", onClick: () => {
         const panel = document.getElementById("room-exchange-panel");
         panel?.scrollIntoView({ block: "start" }); panel?.focus({ preventScroll: true });
       } },
     });
-    return () => { toast.dismiss(toastId); };
-  }, [roomId, id, role, status, from, offered, response, connected, closed]);
+  }, [roomId, id, role, from, trackId, connected, closed]);
 }

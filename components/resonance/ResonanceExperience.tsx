@@ -95,8 +95,8 @@ function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePa
     const track = audioTracks.find(item => item.id === reply.trackId);
     const id = `demo-reaction-${reply.id}`;
     replyToasts.current.add(id);
-    toast(reply.kind === "wave" ? "TA 也向你挥了挥手" : "TA 也喜欢这首歌", {
-      id, description: `${track?.track ?? "刚才那首歌"}`, icon: <InteractionGlyph kind={reply.kind} />,
+    toast("TA 也喜欢这首歌", {
+      id, description: `${track?.track ?? "刚才那首歌"}`, icon: <InteractionGlyph kind="heart" />,
       action: { label: "查看歌曲", onClick: () => {
         const listener = playableListeners.find(item => item.audioTrackId === reply.trackId);
         if (listener) { setSelectedId(listener.id); setView("match"); }

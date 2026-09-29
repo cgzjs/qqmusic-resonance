@@ -1,6 +1,7 @@
 import type { ExchangeCommand, RoomExchange } from "./exchange-protocol";
 export type RoomRole = "host" | "guest";
-export type ReactionKind = "wave" | "heart";
+// 一起听里只留一种回应：“喜欢”。
+export type ReactionKind = "heart";
 export type RoomReaction = { id: string; kind: ReactionKind; from: RoomRole; trackId: string; createdAt: number };
 export type ReactionDelivery = { id: string; kind: ReactionKind; status: "sending" | "sent" | "received" | "failed"; trackId?: string; error?: string };
 export const REACTION_TTL_MS = 6000;
@@ -40,6 +41,13 @@ export const RECONNECT_GRACE_MS = 90_000;
 export const HEARTBEAT_TIMEOUT_MS = 45_000;
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** 房间里的“送 TA 一首”记录；旧版未完成的交换（pending 等）视为无效。 */
+export function isRoomExchange(value: unknown): value is RoomExchange {
+  if (!value || typeof value !== "object") return false;
+  const item = value as RoomExchange;
+  return typeof item.id === "string" && UUID_PATTERN.test(item.id) && ["host", "guest"].includes(item.from) && typeof item.offeredTrackId === "string" && Number.isFinite(item.createdAt) && Number.isFinite(item.completedAt) && item.status === "completed" && !!item.saved && typeof item.saved.host === "boolean" && typeof item.saved.guest === "boolean" && (item.responseTrackId === undefined || (typeof item.responseTrackId === "string" && item.responseTrackId !== item.offeredTrackId));
+}
+
 export function parseRoomMessage(raw: string): RoomMessage | null {
   if (raw.length > 4096) return null;
   try {
@@ -49,13 +57,11 @@ export function parseRoomMessage(raw: string): RoomMessage | null {
     if (value.type === "ping" && Number.isFinite(value.sentAt)) return { type: "ping", sentAt: value.sentAt };
     if (value.type === "leave") return { type: "leave" };
     if (value.type === "exchange") {
-      if (typeof value.id !== "string" || !UUID_PATTERN.test(value.id) || !Number.isFinite(value.sentAt) || !["offer", "respond", "decline", "cancel"].includes(value.action)) return null;
-      if (value.action !== "offer" && (typeof value.exchangeId !== "string" || !UUID_PATTERN.test(value.exchangeId))) return null;
-      if (["offer", "respond"].includes(value.action) && (typeof value.trackId !== "string" || value.trackId.length > 64)) return null;
-      return { type: "exchange", id: value.id, action: value.action, sentAt: value.sentAt, ...(value.action !== "offer" ? { exchangeId: value.exchangeId } : {}), ...(["offer", "respond"].includes(value.action) ? { trackId: value.trackId } : {}) };
+      if (typeof value.id !== "string" || !UUID_PATTERN.test(value.id) || !Number.isFinite(value.sentAt) || value.action !== "offer" || typeof value.trackId !== "string" || value.trackId.length > 64) return null;
+      return { type: "exchange", id: value.id, action: "offer", sentAt: value.sentAt, trackId: value.trackId };
     }
     if (value.type === "reaction-received" && typeof value.id === "string" && UUID_PATTERN.test(value.id)) return { type: "reaction-received", id: value.id };
-    if (value.type === "reaction" && typeof value.id === "string" && UUID_PATTERN.test(value.id) && ["wave", "heart"].includes(value.kind) && typeof value.trackId === "string" && value.trackId.length <= 64 && Number.isFinite(value.sentAt)) return { type: "reaction", id: value.id, kind: value.kind, trackId: value.trackId, sentAt: value.sentAt };
+    if (value.type === "reaction" && typeof value.id === "string" && UUID_PATTERN.test(value.id) && value.kind === "heart" && typeof value.trackId === "string" && value.trackId.length <= 64 && Number.isFinite(value.sentAt)) return { type: "reaction", id: value.id, kind: value.kind, trackId: value.trackId, sentAt: value.sentAt };
     if (value.type !== "command" || typeof value.id !== "string" || !UUID_PATTERN.test(value.id) || !Number.isSafeInteger(value.revision) || value.revision < 0) return null;
     if (!["play", "pause", "seek", "track"].includes(value.action)) return null;
     if (value.action === "seek" && !Number.isFinite(value.position)) return null;
@@ -105,10 +111,6 @@ export function clockOffset(sentAt: number, receivedAt: number, serverTime: numb
 export function isRoomSnapshot(value: unknown): value is RoomSnapshot {
   if (!value || typeof value !== "object") return false;
   const item = value as RoomSnapshot;
-  if (item.exchange !== undefined && item.exchange !== null) {
-    const exchange = item.exchange;
-    if (typeof exchange.id !== "string" || !UUID_PATTERN.test(exchange.id) || !["host", "guest"].includes(exchange.from) || typeof exchange.offeredTrackId !== "string" || !Number.isFinite(exchange.createdAt) || !Number.isFinite(exchange.expiresAt) || !["pending", "completed", "declined", "cancelled", "expired", "ended"].includes(exchange.status) || !exchange.saved || typeof exchange.saved.host !== "boolean" || typeof exchange.saved.guest !== "boolean") return false;
-    if (exchange.status === "completed" && (typeof exchange.responseTrackId !== "string" || exchange.responseTrackId === exchange.offeredTrackId || !Number.isFinite(exchange.completedAt))) return false;
-  }
+  if (item.exchange !== undefined && item.exchange !== null && !isRoomExchange(item.exchange)) return false;
   return typeof item.id === "string" && UUID_PATTERN.test(item.id) && Number.isSafeInteger(item.revision) && item.revision >= 0 && Number.isFinite(item.expiresAt) && typeof item.closed === "boolean" && typeof item.hostConnected === "boolean" && typeof item.guestConnected === "boolean" && !!item.playback && typeof item.playback.trackId === "string" && Number.isFinite(item.playback.position) && item.playback.position >= 0 && typeof item.playback.playing === "boolean" && Number.isFinite(item.playback.updatedAt);
 }

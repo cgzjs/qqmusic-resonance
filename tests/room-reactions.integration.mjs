@@ -31,12 +31,12 @@ test("two-way reactions require receipt, deduplicate, throttle and never change 
   const peers = [host];
   try {
     const welcome = await host.wait(event => event.type === "welcome");
-    const offline = host.reaction("wave");
+    const offline = host.reaction("heart");
     assert.equal((await host.wait(event => event.id === offline.id)).error, "PEER_OFFLINE");
     const guestId = crypto.randomUUID();
     const guest = new Peer(created.roomId, welcome.invitationToken, guestId); peers.push(guest);
     const joined = await guest.wait(event => event.type === "welcome");
-    const reaction = host.reaction("wave");
+    const reaction = host.reaction("heart");
     const received = await guest.wait(event => event.type === "reaction" && event.event.id === reaction.id);
     assert.equal(received.event.from, "host");
     assert.equal((await host.wait(event => event.id === reaction.id)).status, "sent");
@@ -71,7 +71,7 @@ test("two-way reactions require receipt, deduplicate, throttle and never change 
     assert.equal(returned.events.filter(event => event.type === "reaction").length, 0);
     const outsider = new Peer(created.roomId, null); peers.push(outsider);
     await new Promise(resolve => outsider.socket.addEventListener("open", resolve, { once: true }));
-    outsider.reaction("wave");
+    outsider.reaction("heart");
     assert.equal((await outsider.wait(event => event.type === "close")).code, 4001);
   } finally { host.send({ type: "leave" }); for (const peer of peers) peer.socket.close(); }
 });

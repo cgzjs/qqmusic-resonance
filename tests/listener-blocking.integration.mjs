@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { mockAccount, accountHeaders } from "./host-test-helpers.mjs";
-import { setupExchangeRoom, ExchangePeer, accountData } from "./exchange-test-helpers.mjs";
+import { setupExchangeRoom, ExchangePeer, accountData, waitForRecords } from "./exchange-test-helpers.mjs";
 
 const base = process.env.ROOM_TEST_URL ?? "http://localhost:5173";
 const { tracks } = JSON.parse(await readFile(new URL("../lib/resonance/catalog.generated.json", import.meta.url), "utf8"));
@@ -59,7 +59,7 @@ test("a block on either side stops follows, and one-sided unblock does not overr
   } finally { await stop(a, ap); await stop(b, bp); }
 });
 
-test("room blocking stops both clients and pending exchanges; unrelated accounts cannot block a room", async () => {
+test("room blocking stops both clients and keeps songs already sent; unrelated accounts cannot block a room", async () => {
   const setup = await setupExchangeRoom(base, tracks.slice(0, 2).map(t => t.id));
   const stranger = await mockAccount(base);
   const host = new ExchangePeer(base, setup.hostTicket, setup.hostAccount);
@@ -77,12 +77,12 @@ test("room blocking stops both clients and pending exchanges; unrelated accounts
     for (const client of [host, guest]) {
       const closed = await client.wait(e => e.room?.closed);
       assert.equal(closed.room.playback.playing, false);
-      assert.equal(closed.room.exchange.status, "ended");
+      assert.equal(closed.room.exchange.status, "completed");
     }
     assert.deepEqual((await call("block", setup.guestAccount, { roomId: setup.guestTicket.roomId })).blocks, blocked.blocks);
     await call("unblock", setup.guestAccount, { id: blocked.blocks[0].id });
     assert.equal((await fetch(`${base}/api/rooms/${setup.hostTicket.roomId}/status`)).status, 404);
-    assert.equal((await accountData(base, setup.hostAccount)).onlineExchanges.length, 0);
+    assert.equal((await waitForRecords(base, setup.hostAccount)).onlineExchanges[0].sentTrackId, tracks[0].id);
   } finally { host.close(); guest.close(); }
 });
 
