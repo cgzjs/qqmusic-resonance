@@ -124,8 +124,18 @@ export class NearbyArea extends DurableObject<Cloudflare.Env> {
       const bearer = request.headers.get("Authorization");
       const person = Object.values(this.state.people).find(peer => bearer === `Bearer ${peer.token}` && peer.accountId === request.headers.get("X-Account-Id"));
       if (!person) return fail("SESSION_EXPIRED", 401);
+      // 等待中的邀请可能已被取消或超时，确认房间仍有效再展示或接受。
+      if ((action === "state" || action === "accept") && person.ticket?.role === "host") {
+        const status = await this.env.ROOMS.get(this.env.ROOMS.idFromName(person.ticket.roomId)).fetch(new Request("https://room.internal/status", { signal: AbortSignal.timeout(4000) }));
+        if (status.status === 404) person.ticket = null;
+        else if (!status.ok) return fail("CONNECT_FAILED", 503);
+      }
       if (action === "state" && request.method === "GET") { person.lastSeen = now; await this.save(); return reply(this.snapshot(person)); }
       if (request.method !== "POST") return fail("METHOD_NOT_ALLOWED", 405);
+      if (action === "accept") {
+        if (!person.ticket || person.ticket.role !== "host" || person.ticket.roomId !== body.roomId) { await this.save(); return fail("UNAVAILABLE"); }
+        person.lastSeen = now; await this.save(); return reply(this.snapshot(person));
+      }
       if (action === "stop") { delete this.state.people[person.id]; await this.save(); return reply({ ok: true }); }
       person.lastSeen = now;
       if (action === "track") {
@@ -135,7 +145,7 @@ export class NearbyArea extends DurableObject<Cloudflare.Env> {
         const target = typeof body.targetId === "string" && UUID_PATTERN.test(body.targetId) ? this.state.people[body.targetId] : null;
         if (!target || target.accountId === person.accountId || this.blocked(person.accountId, target.accountId)) return fail("UNAVAILABLE");
         if (person.ticket || target.ticket) return fail("BUSY");
-        // 免邀请会直接把对方拉进一起听，按账号限速，重新打开附近可见也不重置。
+        // 按账号限制邀请频率，重新打开附近可见也不重置。
         if (now - (this.state.follows[person.accountId] ?? 0) < NearbyArea.FOLLOW_COOLDOWN_MS) return fail("COOLDOWN", 429);
         this.state.follows[person.accountId] = now;
         const roomId = crypto.randomUUID();

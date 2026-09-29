@@ -15,6 +15,7 @@ const connectionLabels = { idle: "正在连接", connecting: "正在连接", con
 
 type Props = {
   roomId: string;
+  peerAlias?: string;
   player: ResonancePlayer;
   onExit: () => void;
   onTrack?: (trackId: string) => void;
@@ -23,11 +24,11 @@ type Props = {
 };
 
 // 一起听本体：页面版（刷新/重连）和附近页原地版共用。进入即连接，不再多一屏确认。
-export function RoomSession({ roomId, player, onExit, onTrack, variant, headerExtra }: Props) {
+export function RoomSession({ roomId, peerAlias = "TA", player, onExit, onTrack, variant, headerExtra }: Props) {
   const host = useHost();
   const saveHistory = host.save;
   const roomConnection = useListeningRoom(roomId);
-  const { room, role, connection, error, join } = roomConnection;
+  const { room, role, connection, error, join, peerHasJoined } = roomConnection;
   const { needsGesture, enableAudio } = useRoomAudio(room, connection, roomConnection.offset, player, roomConnection.isSynchronized);
   const selectedTrack = audioTracks.find(track => track.id === room?.playback.trackId);
   const connected = connection === "connected" && !room?.closed;
@@ -42,10 +43,11 @@ export function RoomSession({ roomId, player, onExit, onTrack, variant, headerEx
   const { command } = roomConnection;
   useEffect(() => {
     if (resumeStep.current === "done" || !room || !connected || !role) return;
-    if (role === "host" && room.revision === 0 && resumeFrom.trackId === room.playback.trackId && resumeFrom.position > 1) {
-      if (resumeStep.current === "idle") { resumeStep.current = "seeking"; command("seek", { position: resumeFrom.position }); }
+    if (resumeStep.current === "idle" && role === "host" && room.revision <= 2 && resumeFrom.trackId === room.playback.trackId && resumeFrom.position > 1) {
+      resumeStep.current = "seeking"; command("seek", { position: resumeFrom.position });
       return;
     }
+    if (resumeStep.current === "seeking" && Math.abs(room.playback.position - resumeFrom.position) > .25) return;
     resumeStep.current = "done";
     if (role === "host" && resumeFrom.playing && !room.playback.playing) command("play");
   }, [room, connected, role, command, resumeFrom]);
@@ -62,12 +64,14 @@ export function RoomSession({ roomId, player, onExit, onTrack, variant, headerEx
   }
 
   const peerOnline = connected && !!room && (role === "host" ? room.guestConnected : room.hostConnected);
-  return <RoomStage variant={variant} headerExtra={headerExtra} status={connectionLabels[connection]} connected={connected} player={player} onLeave={leave}
+  const waiting = connected && role === "guest" && !peerOnline && !peerHasJoined;
+  return <RoomStage variant={variant} headerExtra={headerExtra} status={waiting ? "等待 TA 加入" : connectionLabels[connection]} connected={connected} player={player} onLeave={leave}
     before={!room && connection !== "closed" && connection !== "error" && <p className="tp-follow" role="status">正在进入一起听…</p>}
     body={room ? {
       mode: "online", track: selectedTrack, role, peerOnline,
       selfOnline: connected && (role === "host" ? room.hostConnected : room.guestConnected),
       outgoing: roomConnection.outgoingReaction, incoming: roomConnection.incomingReaction,
+      waiting: waiting && <div className="tp-room-waiting" role="status"><span className="tp-waiting-signal" aria-hidden="true"><i /><i /><i /></span><h3>正在等 {peerAlias} 加入</h3><p>邀请已送达，TA 点击「加入一起听」后<br />就能和你一起听这首歌</p><small>如果 TA 暂时没空，可以取消等待</small></div>,
       seekable: canControl, onSeek: position => command("seek", { position }),
       progressData: { "data-room-revision": room.revision, "data-target-position": room.playback.position, "data-room-playing": room.playback.playing },
       host: role === "host" ? { playing: room.playback.playing, disabled: !canControl, trackId: room.playback.trackId, onToggle: () => command(room.playback.playing ? "pause" : "play"), onTrack: trackId => command("track", { trackId }) } : undefined,
@@ -75,7 +79,7 @@ export function RoomSession({ roomId, player, onExit, onTrack, variant, headerEx
       notice: (needsGesture || player.error) && <div className="tp-notice" role="status"><span>{player.error ?? "打开声音，跟上 TA 的播放"}</span><button type="button" className="tp-link" disabled={!connected} onClick={() => void enableAudio()}>{player.error ? "重试播放" : "打开声音"}</button></div>,
       reaction: { disabled: !connected || !room.hostConnected || !room.guestConnected, disabledHint: connection === "closed" ? "一起听已结束" : !connected ? "连接恢复后再回应" : "等双方在线，再回应这首歌", onSend: roomConnection.sendReaction },
       gift: <RoomExchangePanel key={room.exchange?.id ?? "idle"} connection={roomConnection} />,
-      leaveLabel: !connected ? "回到附近" : "结束一起听",
+      leaveLabel: waiting ? "取消等待" : !connected ? "回到附近" : "结束一起听",
       safety: <BlockListenerButton target={{ roomId }} alias="这位听众" disabled={!connected} onBlocked={leave} />,
     } : null}
     after={<>

@@ -44,9 +44,13 @@ function ConnectedNearby({ session, initialSource }: { session: HostSession; ini
     leaveSession();
     if (trackId) void request("start", { trackId });
   }, [leaveSession, request, trackId]);
-  useFollowerNotification(joined);
+  const invitation = snapshot?.ticket?.role === "host" ? snapshot.ticket : null;
+  const acceptInvitation = useCallback(() => {
+    if (invitation && !busy) void request("accept", { roomId: invitation.roomId });
+  }, [invitation, busy, request]);
+  useFollowerNotification(invitation, acceptInvitation);
   return <>
     {host.dataError && <div className="room-error integrated-error" role="alert">{host.dataError}<button className="room-secondary" onClick={host.refreshData}>重新加载</button></div>}
-    {host.dataLoading ? <p className="plugin-host-status" role="status">正在加载你的足迹…</p> : <ResonanceExperience roomView={room ? player => <RoomSession key={room} variant="inline" roomId={room} player={player} onExit={exitRoom} onTrack={demoHost.setTrack} /> : null} playbackHeader={room ? undefined : player => <CurrentPlaybackBar player={player} />} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineActive={!!snapshot && !snapshot.ticket} onPauseOnline={() => { if (!busy) void request("stop", {}); }} />}
+    {host.dataLoading ? <p className="plugin-host-status" role="status">正在加载你的足迹…</p> : <ResonanceExperience roomView={room ? player => <RoomSession key={room} variant="inline" roomId={room} peerAlias={joined?.peerAlias} player={player} onExit={exitRoom} onTrack={demoHost.setTrack} /> : null} playbackHeader={room ? undefined : player => <CurrentPlaybackBar player={player} />} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineActive={!!snapshot && !snapshot.ticket} onPauseOnline={() => { if (!busy) void request("stop", {}); }} />}
   </>;
 }

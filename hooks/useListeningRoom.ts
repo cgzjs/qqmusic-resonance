@@ -27,6 +27,7 @@ export function useListeningRoom(roomId: string) {
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [room, setRoom] = useState<RoomSnapshot | null>(null);
   const [role, setRole] = useState<RoomRole | null>(null);
+  const [peerHasJoined, setPeerHasJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [exchangeRequest, setExchangeRequest] = useState<"idle" | "sending" | "uncertain">("idle");
@@ -170,6 +171,7 @@ export function useListeningRoom(roomId: string) {
             setError(null); setConnection("connected");
             socket.send(JSON.stringify({ type: "ping", sentAt: Date.now() }));
           }
+          if (roleRef.current === "guest" ? message.room.hostConnected : roleRef.current === "host" && message.room.guestConnected) setPeerHasJoined(true);
           if (resumePingRef.current !== null && message.sentAt === resumePingRef.current) {
             resumePingRef.current = null; synchronizedRef.current = true;
             if (timerRef.current) clearTimeout(timerRef.current);
@@ -300,5 +302,5 @@ export function useListeningRoom(roomId: string) {
   }, [transmitExchange]);
   const retryExchange = useCallback(() => { if (exchangeCommandRef.current) transmitExchange(exchangeCommandRef.current); }, [transmitExchange]);
 
-  return { connection, room, role, error, offset, join, command, leave, outgoingReaction, incomingReaction, sendReaction, exchangeRequest, exchangeError, sendExchange, retryExchange, isSynchronized };
+  return { connection, room, role, peerHasJoined, error, offset, join, command, leave, outgoingReaction, incomingReaction, sendReaction, exchangeRequest, exchangeError, sendExchange, retryExchange, isSynchronized };
 }

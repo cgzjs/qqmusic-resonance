@@ -47,9 +47,9 @@ export function useNearby(session: HostSession) {
   const mountedRef = useRef(true);
   const enteringRef = useRef(room !== null);
 
-  // 拿到房间凭据即进入：同时退出附近可见，避免一边一起听一边被别人找到。
-  const enterSession = useCallback((next: NearbySnapshot) => {
-    if (!next.ticket || enteringRef.current) return false;
+  // 邀请人直接进入等待；房主仅在主动接受后进入。
+  const enterSession = useCallback((next: NearbySnapshot, accepted = false) => {
+    if (!next.ticket || enteringRef.current || (next.ticket.role === "host" && !accepted)) return false;
     const prefix = `resonance.nearby-room.${session.accountId}.`;
     try {
       sessionStorage.setItem(prefix + next.ticket.roomId, next.ticket.token);
@@ -120,7 +120,7 @@ export function useNearby(session: HostSession) {
       readyRef.current = true; setReady(true); setNow(Date.now() + serverOffset.current);
       setError(null);
       if (result.token) tokenRef.current = result.token;
-      if (!enterSession(result)) setSnapshot(result);
+      if (!enterSession(result, action === "accept")) setSnapshot(result);
     } catch (reason) {
       if (mountedRef.current && startedEpoch === epoch.current) {
         readyRef.current = false; setReady(false);

@@ -5,11 +5,18 @@ import { audioTracks } from "@/lib/resonance/demo-data";
 import type { SessionTicket } from "@/lib/resonance/nearby-protocol";
 import type { RoomRole, RoomSnapshot } from "@/lib/resonance/room-protocol";
 
-// 免邀请：有人跟你一起听时只提醒一次，不需要你处理。
-export function useFollowerNotification(ticket: SessionTicket | null) {
+// 侧边邀请不打断当前页面，只有点击加入才进入房间。
+export function useFollowerNotification(ticket: SessionTicket | null, onAccept: () => void) {
   const roomId = ticket?.role === "host" ? ticket.roomId : null, alias = ticket?.peerAlias;
+  const accept = useRef(onAccept);
+  useEffect(() => { accept.current = onAccept; }, [onAccept]);
   useEffect(() => {
-    if (roomId) toast(`${alias} 在跟你一起听`, { id: `nearby-follower-${roomId}`, description: "你放什么，TA 就听什么", duration: 6000 });
+    if (!roomId) return;
+    const id = `nearby-follower-${roomId}`;
+    toast(`${alias} 想和你一起听`, { id, description: "TA 已在房间等你，准备好了再加入", duration: Infinity,
+      action: { label: "加入一起听", onClick: () => accept.current() },
+    });
+    return () => { toast.dismiss(id); };
   }, [roomId, alias]);
 }
 

@@ -62,6 +62,7 @@ test("follow opens a room at once: the followed listener hosts, both get tickets
   const storage = new Map();
   const inits = [];
   const env = { ROOMS: { idFromName: id => id, get: id => ({ fetch: async request => {
+    if (request.url.endsWith("/status")) return Response.json({ active: true });
     const body = await request.json(); inits.push({ id, url: request.url, body });
     return Response.json({ hostToken: "host-token", guestToken: "guest-token" });
   } }) } };

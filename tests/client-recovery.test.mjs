@@ -173,7 +173,7 @@ test("follow is disabled offline, never sent while offline, and does not auto-st
   assert.equal(calls.filter(item => item.url?.endsWith("start")).length, 1);
 });
 
-test("tapping follow enters the room at once without any invitation step", async () => {
+test("tapping follow enters the inviter's room immediately", async () => {
   respond = async () => response({ ...nearby({ peers: [peerB()] }), token });
   await mount("nearby"); await act(async () => current.request("start", { trackId: audioTracks[0].id }));
   assert.equal(document.body.textContent.includes("邀请"), false);
@@ -185,6 +185,34 @@ test("tapping follow enters the room at once without any invitation step", async
   assert.deepEqual(JSON.parse(sent.options.body), { targetId: token });
   assert.equal(current.room, id); assert.deepEqual(current.joined, ticket);
   assert.equal(calls.filter(item => item.url?.endsWith("stop")).length, 1);
+});
+
+test("a host ticket keeps the current page and playback until the invitation is accepted", async () => {
+  const ticket = { roomId: id, token, role: "host", peerAlias: "听众 B" };
+  respond = async () => response({ ...nearby({ ticket }), token });
+  await mount("nearby"); await act(async () => current.request("start", { trackId: audioTracks[0].id }));
+  assert.equal(current.room, null); assert.equal(current.joined, null);
+  assert.equal(sessionStorage.getItem("resonance.nearby-room.account-a.active"), null);
+  assert.equal(calls.some(item => item.pause || item.play || item.route || item.url?.endsWith("stop")), false);
+  const accept = [...document.querySelectorAll("button")].find(button => button.textContent === "加入一起听");
+  assert.ok(accept); assert.match(document.body.textContent, /听众 B 想和你一起听/);
+  respond = async url => response(url.endsWith("stop") ? {} : nearby({ ticket }));
+  await act(async () => accept.click());
+  assert.deepEqual(JSON.parse(calls.find(item => item.url?.endsWith("accept")).options.body), { roomId: id });
+  assert.equal(current.room, id); assert.deepEqual(current.joined, ticket);
+});
+
+test("cancelled invitations disappear on the next poll and a failed accept never enters", async () => {
+  const ticket = { roomId: id, token, role: "host", peerAlias: "听众 B" };
+  respond = async () => response({ ...nearby({ ticket }), token });
+  await mount("nearby"); await act(async () => current.request("start", {}));
+  respond = async () => response({ error: "UNAVAILABLE" }, 409);
+  await act(async () => current.request("accept", { roomId: id }));
+  assert.equal(current.room, null); assert.match(current.error, /已离开/);
+  respond = async () => response(nearby());
+  await act(async () => current.request("state"));
+  assert.equal(document.querySelector(".tp-invitation"), null);
+  assert.equal(current.room, null);
 });
 
 test("a queued follow is discarded after offline; late poll cannot restore readiness", async t => {
@@ -242,19 +270,36 @@ test("inline room joins on mount without a confirm screen and exits without navi
   assert.equal(sockets[0].sent.at(-1).type, "leave");
 });
 
+test("inviter waits with a cancellable loading signal until the host joins", async () => {
+  recoveryTest.host = { session: recoveryTest.session, save: async () => true };
+  await act(async () => root.render(React.createElement(RoomSession, { roomId: id, peerAlias: "听众 B", player, variant: "inline", onExit() {} })));
+  const socket = sockets.at(-1);
+  await act(async () => { socket.open(); socket.message({ type: "welcome", role: "guest", room: room({ hostConnected: false, guestConnected: true, playback: { trackId: audioTracks[0].id, position: 0, playing: false, updatedAt: Date.now() } }), serverTime: Date.now() }); });
+  assert.match(document.querySelector(".tp-room-waiting").textContent, /正在等 听众 B 加入/);
+  assert.equal(document.querySelectorAll(".tp-waiting-signal i").length, 3);
+  assert.ok([...document.querySelectorAll("button")].some(button => button.textContent === "取消等待"));
+  assert.equal(document.querySelector(".tp-room-progress"), null);
+  assert.equal(document.querySelector(".reaction-dock"), null);
+  await act(async () => socket.message({ type: "state", room: room(), serverTime: Date.now() }));
+  assert.equal(document.querySelector(".tp-room-waiting"), null);
+  assert.ok(document.querySelector(".tp-room-progress"));
+  await act(async () => socket.message({ type: "state", room: room({ hostConnected: false }), serverTime: Date.now() }));
+  assert.equal(document.querySelector(".tp-room-waiting"), null, "a later disconnect must not look like an unanswered invitation");
+});
+
 test("followed host carries on from the same spot: seek, then play once the room has it", async () => {
   recoveryTest.host = { session: recoveryTest.session, save: async () => true, dataError: null };
   Object.assign(player, { status: "playing", wantsPlayback: true, currentTime: 30, volume: 1, error: null, stop() {}, changeVolume() {} });
   await act(async () => root.render(React.createElement(RoomSession, { roomId: id, player, variant: "inline", onExit() {} })));
   await flush();
   const socket = sockets.at(-1);
-  const fresh = { revision: 0, playback: { trackId: audioTracks[0].id, position: 0, playing: false, updatedAt: Date.now() } };
+  const fresh = { revision: 2, playback: { trackId: audioTracks[0].id, position: 0, playing: false, updatedAt: Date.now() } };
   await act(async () => { socket.open(); socket.message({ type: "welcome", role: "host", room: room(fresh), serverTime: Date.now() }); });
   const commands = () => socket.sent.filter(item => item.type === "command");
-  assert.deepEqual(commands().map(item => [item.action, item.position, item.revision]), [["seek", 30, 0]]);
-  await act(async () => socket.message({ type: "state", room: room({ revision: 1, playback: { ...fresh.playback, position: 30 } }), serverTime: Date.now() }));
+  assert.deepEqual(commands().map(item => [item.action, item.position, item.revision]), [["seek", 30, 2]]);
+  await act(async () => socket.message({ type: "state", room: room({ revision: 3, playback: { ...fresh.playback, position: 30 } }), serverTime: Date.now() }));
   assert.deepEqual(commands().map(item => item.action), ["seek", "play"]);
-  await act(async () => socket.message({ type: "state", room: room({ revision: 2, playback: { ...fresh.playback, position: 30, playing: true } }), serverTime: Date.now() }));
+  await act(async () => socket.message({ type: "state", room: room({ revision: 4, playback: { ...fresh.playback, position: 30, playing: true } }), serverTime: Date.now() }));
   assert.equal(commands().length, 2);
 });
 
@@ -400,15 +445,22 @@ test("journey has two tabs: gifts sit above the timeline, favorites and later sh
   assert.match(document.body.textContent, /待听/); assert.match(document.body.textContent, /稍后再听/);
 });
 
-test("followed listener is told once who joined; the follower gets no toast", async () => {
-  function Harness({ ticket }) { useFollowerNotification(ticket); return null; }
+test("host notification waits for an explicit click, keeps the latest handler and dismisses stale invitations", async () => {
+  let accepted = 0;
+  function Harness({ ticket, onAccept = () => accepted++ }) { useFollowerNotification(ticket, onAccept); return null; }
   const ticket = { roomId: id, token, role: "host", peerAlias: "听众 B" };
   await act(async () => root.render(React.createElement(Harness, { ticket })));
   await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket } })));
   assert.equal(recoveryTest.toasts.length, 1);
-  assert.equal(recoveryTest.toasts[0].title, "听众 B 在跟你一起听");
+  assert.equal(accepted, 0);
+  assert.equal(recoveryTest.toasts[0].title, "听众 B 想和你一起听");
+  assert.equal(recoveryTest.toasts[0].action.label, "加入一起听");
+  await act(async () => root.render(React.createElement(Harness, { ticket, onAccept: () => accepted += 2 })));
+  await act(async () => recoveryTest.toasts[0].action.onClick());
+  assert.equal(accepted, 2);
   await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket, roomId: token, role: "guest" } })));
   assert.equal(recoveryTest.toasts.length, 1);
+  assert.ok(recoveryTest.dismissedToasts.includes(`nearby-follower-${id}`));
 });
 
 test("room gift toasts only the recipient, once per gift", async () => {

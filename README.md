@@ -94,11 +94,11 @@ docs/
 
 当前范围与下一步以 [产品说明](./docs/product-spec.md) 为准；[外观与截图](./docs/ui-refresh.md)、[双页面登录](./docs/prd-tab-login.md)、[回歌收件](./docs/prd-received-songs.md) 和 [客户端恢复](./docs/prd-client-recovery.md) 记录专项约定。历史版本文档保留设计背景，不覆盖当前行为。
 
-本地验证：在两个独立标签页打开 `/nearby`，分别登录 A/B 并开启发现，发出邀请后在另一页接受，双方点击“开启声音并加入”。可测试同步播放、切歌、交换与跨页通知；退出一个标签页账号不会退出另一个标签页。生产构建默认关闭模拟宿主。
+本地验证：在两个独立标签页打开 `/nearby`，分别登录 A/B 并开启附近可见。点击“跟 TA 一起听”后，邀请人进入房间显示等待动画，主机保留当前页面和播放；主机点击侧边通知或附近页的“加入一起听”后才进入房间。邀请人可取消等待，过期或取消的邀请会自动撤下。可测试同步播放、切歌、送歌与跨页通知；退出一个标签页账号不会退出另一个标签页。生产构建默认关闭模拟宿主。
 
 验证命令：`npm run lint`、`npx tsc --noEmit --incremental false`、`npm run build`。本地逻辑测试为 `test:resonance`、`test:rooms`、`test:exchanges`、`test:playlist`、`test:recovery`、`test:received`、`test:login`。
 
-保持开发服务运行后，当前歌单可运行 `test:playlist:integration`、`test:login:integration`、`test:replies:integration`、`test:received:integration`，可用 `ROOM_TEST_URL` 指定地址。其余历史多人集成用例使用固定的合成试听 ID，需要原始试听配置；不能将它们直接用于当前自备歌单。
+保持开发服务运行后，当前歌单可运行 `test:nearby:integration`、`test:playlist:integration`、`test:login:integration`、`test:replies:integration`、`test:received:integration`，可用 `ROOM_TEST_URL` 指定地址。其余历史多人集成用例使用固定的合成试听 ID，需要原始试听配置；不能将它们直接用于当前自备歌单。
 
 当前少量歌曲使用完整缓冲支持进度跳转，不是流媒体曲库方案。验证覆盖同一电脑的两个浏览器会话；真实 QQ SDK、地理位置、双手机锁屏/网络切换及公网部署尚未验收。
 

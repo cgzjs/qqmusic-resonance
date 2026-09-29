@@ -450,6 +450,22 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-room-foot .listener-safety:has(.listener-block-confirm, [role="status"], [role="alert"]) { flex-basis: 100%; }
 .tp-room .listener-block-confirm { border-color: var(--cover-line); border-radius: 12px; background: var(--cover-glass); }
 
+.tp-invitation { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0 20px; padding: 16px; border: 1px solid var(--cover-line); border-radius: 16px; background: var(--cover-tone-soft); color: var(--cover-ink); animation: tp-rise .24s var(--tp-ease) both; }
+.tp-invitation > svg { flex: none; color: var(--cover-accent); }
+.tp-invitation > div { flex: 1; min-width: 180px; }
+.tp-invitation strong { font-size: 14px; font-weight: 600; }
+.tp-invitation p { margin: 4px 0 0; color: var(--cover-ink-2); font-size: 12px; line-height: 1.6; }
+.tp-invitation > .tp-btn { flex: 1 0 100%; min-height: 44px; }
+.tp-room-waiting { padding: 20px 12px 12px; text-align: center; }
+.tp-waiting-signal { display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; color: var(--cover-accent); }
+.tp-waiting-signal i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: tp-wait 1.2s ease-in-out infinite; }
+.tp-waiting-signal i:nth-child(2) { animation-delay: .16s; }
+.tp-waiting-signal i:nth-child(3) { animation-delay: .32s; }
+.tp-room-waiting h3 { margin: 12px 0 8px; color: var(--cover-ink); font-size: 17px; font-weight: 600; }
+.tp-room-waiting p { margin: 0; color: var(--cover-ink-2); font-size: 13px; line-height: 1.8; }
+.tp-room-waiting small { display: block; margin-top: 16px; color: var(--cover-ink-2); font-size: 12px; }
+@keyframes tp-wait { 0%, 80%, 100% { opacity: .4; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
+
 @keyframes tp-spin { to { transform: rotate(360deg); } }
 @keyframes tp-fade { from { opacity: 0; } }
 @keyframes tp-rise { from { opacity: 0; transform: translateY(8px); } }

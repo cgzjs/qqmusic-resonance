@@ -59,9 +59,10 @@ type Props = { nearby: ReturnType<typeof useNearby>; currentTrackId: string | nu
 
 export function OnlineNearbyPanel({ nearby, currentTrackId, player }: Props) {
   const { snapshot, busy, error, ready, online, request } = nearby;
-  return <NearbyRadar peers={snapshot?.peers ?? []} visible={!!snapshot} ready={ready} online={online} busy={busy} error={error} currentTrackId={currentTrackId} player={player}
+  const invitation = snapshot?.ticket?.role === "host" ? snapshot.ticket : null;
+  return <>{invitation && <aside className="tp-invitation" aria-label="一起听邀请"><Headphones size={20} aria-hidden="true" /><div><strong>{invitation.peerAlias} 想和你一起听</strong><p>TA 在房间等你，准备好了再加入</p></div><button type="button" className="tp-btn tp-btn--primary" disabled={busy || !ready || !online} aria-busy={busy} onClick={() => void request("accept", { roomId: invitation.roomId })}>{busy ? "正在加入…" : "加入一起听"}</button></aside>}<NearbyRadar peers={snapshot?.peers ?? []} visible={!!snapshot} ready={ready} online={online} busy={busy} error={error} currentTrackId={currentTrackId} player={player}
     switchDisabled={busy || !!snapshot?.ticket || (!snapshot && (!currentTrackId || !online))}
     onVisibleChange={() => void request(snapshot ? "stop" : "start", snapshot ? {} : { trackId: currentTrackId })}
     onFollow={peer => void request("follow", { targetId: peer.id })}
-    safety={peer => <BlockListenerButton target={{ targetId: peer.id }} alias={peer.alias} disabled={busy || !ready} onBlocked={() => void request("state")} />} />;
+    safety={peer => <BlockListenerButton target={{ targetId: peer.id }} alias={peer.alias} disabled={busy || !ready} onBlocked={() => void request("state")} />} /></>;
 }
