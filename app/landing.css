@@ -139,14 +139,24 @@
 @keyframes exchange-return { 0%, 20%, 100% { transform: translateX(3px); opacity: .45; } 50%, 70% { transform: translateX(-3px); opacity: 1; } }
 
 .terminal-preview { display: grid; gap: 16px; min-width: 0; }
+/* 演示节奏：切章时画面像终端刷新一样闪入；雷达扫过的听众点会亮起并泛出一圈信号。 */
+.signal-radar, .signal-sync, .signal-exchange { animation: signal-boot .5s ease-out both; }
+.signal-radar__nodes circle { animation: radar-node 18s linear infinite; }
+.signal-radar__pings circle { fill: none; stroke: var(--terminal-cyan); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; transform-box: fill-box; transform-origin: center; animation: radar-ping 18s ease-out infinite; }
+@keyframes signal-boot { 0% { opacity: 0; } 35% { opacity: .85; } 50% { opacity: .35; } 100% { opacity: 1; } }
+@keyframes radar-node { 0% { fill: var(--terminal-cyan); } 12%, 100% { fill: #9bacc4; } }
+@keyframes radar-ping { 0% { opacity: .9; transform: scale(1); } 8%, 100% { opacity: 0; transform: scale(3.4); } }
 .terminal-chapters { display: flex; justify-content: center; gap: 12px; padding: 0; }
-.terminal-chapters button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 0 22px; border: 1px solid transparent; border-radius: 2px; color: var(--terminal-muted); font-size: 12px; transition: background .2s, color .2s; }
+.terminal-chapters button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 0 22px; border: 1px solid transparent; border-radius: 2px; color: var(--terminal-muted); font-size: 12px; transition: background .2s, color .2s; }
 .terminal-chapters button[aria-pressed="true"] { color: var(--terminal-cyan); border-color: var(--terminal-line); background: #6feee109; }
 .terminal-chapters button:hover { color: var(--terminal-cyan); background: #6feee110; }
 .terminal-chapters button:focus-visible { outline-offset: -5px; }
+/* 自动演示时，当前章节下方走一条进度线，走完切到下一章；手动点选后不再出现。 */
+.terminal-chapters__progress { position: absolute; right: 10px; bottom: 6px; left: 10px; height: 1px; background: var(--terminal-cyan); transform: scaleX(0); transform-origin: left; animation: chapter-progress var(--chapter-seconds, 10s) linear forwards; pointer-events: none; }
+@keyframes chapter-progress { to { transform: scaleX(1); } }
 .terminal-motion { display: grid; place-items: center; width: 44px; height: 44px; margin-left: auto; color: var(--terminal-muted); }
 .terminal-motion:hover { color: var(--terminal-cyan); }
-.resonance-cover[data-paused="true"] :is(.terminal-spectrum i, .signal-radar__sweep, .orbital-piece, .orbital-piece img, .orbital-ufo__shadow, .listening-waveform__bars--played, .listening-waveform__cursor, .exchange-route__out, .exchange-route__in) { animation-play-state: paused; }
+.resonance-cover[data-paused="true"] :is(.terminal-spectrum i, .signal-radar__sweep, .orbital-piece, .orbital-piece img, .orbital-ufo__shadow, .listening-waveform__bars--played, .listening-waveform__cursor, .exchange-route__out, .exchange-route__in, .signal-radar__nodes circle, .signal-radar__pings circle, .terminal-chapters__progress) { animation-play-state: paused; }
 
 /* Locally hosted Solar artwork: quiet motion, kept in the headline's empty margin. */
 .orbital-decorations { position: absolute; inset: 0; pointer-events: none; user-select: none; }

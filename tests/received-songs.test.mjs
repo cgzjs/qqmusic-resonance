@@ -12,6 +12,14 @@ test("received songs keep separate deliveries of the same track and distinguish 
   assert.equal(items.every(item => item.receivedTrackId === "b"), true);
 });
 
+test("one-way gifts only show up for the recipient", () => {
+  const completedAt = Date.parse("2026-09-29T01:00:00Z");
+  const items = receivedSongs({ events: [], onlineExchanges: [{ id: "sent", roomId: "room", sentTrackId: "a", completedAt }, { id: "got", roomId: "room", receivedTrackId: "b", completedAt }], readExchangeIds: [] });
+  assert.deepEqual(items.map(item => item.id), ["online:room:got"]);
+  assert.equal(items[0].receivedTrackId, "b");
+  assert.equal("sentTrackId" in items[0], false);
+});
+
 test("legacy accounts without receipts can derive their migration read ids", () => {
   const items = receivedSongs({ events: [{ id: "old", type: "exchange", trackId: "removed-a", receivedTrackId: "removed-b", createdAt: "2026-09-20T01:00:00Z" }], onlineExchanges: [] });
   assert.deepEqual(items.map(item => item.id), ["demo:old"]);

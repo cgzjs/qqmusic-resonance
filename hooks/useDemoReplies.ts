@@ -22,14 +22,15 @@ export function useDemoReplies(onReply: (reply: DemoReply) => void) {
   }, [data.demoReplies, claimReply]);
   const latest = (data.demoReplies ?? []).filter(item => item.kind !== "exchange").at(-1);
   const reaction: ReactionDelivery | null = latest && (!sending || latest.id === sending.id) ? {
-    id: latest.id, kind: latest.kind as ReactionKind, trackId: latest.trackId, status: latest.status === "pending" ? "sent" : "received",
+    // 旧版的“打招呼”也按“喜欢”显示。
+    id: latest.id, kind: "heart", trackId: latest.trackId, status: latest.status === "pending" ? "sent" : "received",
   } : sending;
   const sendReaction = useCallback(async (kind: ReactionKind, trackId: string) => {
     if (busy.current || (data.demoReplies ?? []).some(item => item.kind !== "exchange" && item.status === "pending")) return;
     busy.current = true;
     const id = sending?.status === "failed" && sending.kind === kind && sending.trackId === trackId ? sending.id : crypto.randomUUID();
     setSending({ id, kind, trackId, status: "sending" });
-    const ok = await save(kind === "wave" ? "queueWave" : "queueHeart", trackId, id);
+    const ok = await save("queueHeart", trackId, id);
     busy.current = false;
     if (mounted.current) setSending(ok ? null : { id, kind, trackId, status: "failed", error: "DELIVERY_UNCONFIRMED" });
   }, [data.demoReplies, save, sending]);

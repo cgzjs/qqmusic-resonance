@@ -9,6 +9,18 @@
       "audioUrl": "/audio/yorushika-miyakoochi.mp3?v=510a8d6cc9950000",
       "coverUrl": "/covers/yorushika-gentou.jpg?v=76904df30284b195",
       "accent": "#6feee1",
+      "palette": {
+        "dark": {
+          "base": "#0f1c26",
+          "accent": "#f2d28a",
+          "ink": "#f5f3ef"
+        },
+        "light": {
+          "base": "#eef3f6",
+          "accent": "#7a5a14",
+          "ink": "#13232e"
+        }
+      },
       "source": "自备模拟歌单",
       "duration": 250.17469387755102,
       "mimeType": "audio/mpeg",
@@ -23,6 +35,18 @@
       "audioUrl": "/audio/yorushika-matasaburo.mp3?v=d4cfc3434c9c06da",
       "coverUrl": "/covers/yorushika-matasaburo.jpg?v=db1eb6257ef6bac6",
       "accent": "#a8bdd8",
+      "palette": {
+        "dark": {
+          "base": "#151a24",
+          "accent": "#9cc3da",
+          "ink": "#f3f4f6"
+        },
+        "light": {
+          "base": "#eff2f6",
+          "accent": "#2f5f7c",
+          "ink": "#1a2230"
+        }
+      },
       "source": "自备模拟歌单",
       "duration": 229.35510204081632,
       "mimeType": "audio/mpeg",
@@ -37,6 +61,18 @@
       "audioUrl": "/audio/yorushika-roujin-to-umi.mp3?v=8187d4c7c2970609",
       "coverUrl": "/covers/yorushika-roujin-to-umi.jpg?v=61d04adc2c91ec20",
       "accent": "#d6b98c",
+      "palette": {
+        "dark": {
+          "base": "#101a1a",
+          "accent": "#86c7d8",
+          "ink": "#f1f5f4"
+        },
+        "light": {
+          "base": "#eef4f3",
+          "accent": "#245f6e",
+          "ink": "#172322"
+        }
+      },
       "source": "自备模拟歌单",
       "duration": 255.3208163265306,
       "mimeType": "audio/mpeg",
@@ -51,6 +87,18 @@
       "audioUrl": "/audio/sana-kotoba-no-iranai-yakusoku.ogg?v=e4318236e58b17ea",
       "coverUrl": "/covers/naruto-the-best.jpg?v=493035a3bc7849c8",
       "accent": "#c8b3db",
+      "palette": {
+        "dark": {
+          "base": "#1f150e",
+          "accent": "#e6c595",
+          "ink": "#f6f1ea"
+        },
+        "light": {
+          "base": "#f6f1ea",
+          "accent": "#7a4f25",
+          "ink": "#2a1c12"
+        }
+      },
       "source": "自备模拟歌单",
       "duration": 253.92,
       "mimeType": "audio/ogg",

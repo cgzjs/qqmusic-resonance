@@ -45,16 +45,17 @@ test("refresh/resume keeps original deadline, duplicate submission and competing
 
 test("reaction and exchange can wait together; missing clients do not cancel saved work", async () => {
   const a = await mockAccount(base);
-  const wave = { action: "queueWave", id: crypto.randomUUID(), trackId: tracks[0].id };
-  await data(a.session, wave);
-  await data(a.session, { ...wave, id: crypto.randomUUID(), action: "queueHeart" }, 409);
+  await data(a.session, { action: "queueWave", id: crypto.randomUUID(), trackId: tracks[0].id }, 400);
+  const heart = { action: "queueHeart", id: crypto.randomUUID(), trackId: tracks[0].id };
+  await data(a.session, heart);
+  await data(a.session, { ...heart, id: crypto.randomUUID() }, 409);
   const command = exchange(); await data(a.session, command);
   // No client polling/heartbeat while both server-owned deadlines elapse.
   await new Promise(resolve => setTimeout(resolve, 3000));
   const completed = await data(a.session);
   assert.equal(completed.demoReplies.filter(item => item.status === "ready").length, 2);
   assert.equal(completed.events.length, 1);
-  assert.equal((await data(a.session, { action: "claimReply", id: wave.id })).reply.kind, "wave");
-  assert.equal((await data(a.session, { action: "claimReply", id: wave.id })).claimed, false);
+  assert.equal((await data(a.session, { action: "claimReply", id: heart.id })).reply.kind, "heart");
+  assert.equal((await data(a.session, { action: "claimReply", id: heart.id })).claimed, false);
   await data(a.session, { action: "queueHeart", id: crypto.randomUUID(), trackId: "missing-track" }, 400);
 });

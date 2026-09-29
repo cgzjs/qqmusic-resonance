@@ -35,15 +35,14 @@ test("online exchange receipts belong to each recipient and replay does not rest
     await host.wait(event => event.room?.hostConnected && event.room.guestConnected);
     await guest.wait(event => event.type === "welcome");
     const offer = host.command("offer", { trackId: tracks[0].id });
+    await host.wait(event => event.requestId === offer.id && !event.error);
     await guest.wait(event => event.room?.exchange?.id === offer.id);
-    const reply = guest.command("respond", { exchangeId: offer.id, trackId: tracks[1].id });
-    await guest.wait(event => event.requestId === reply.id && !event.error);
     await Promise.all([waitForRecords(base, setup.hostAccount), waitForRecords(base, setup.guestAccount)]);
     const id = `online:${setup.hostTicket.roomId}:${offer.id}`;
-    await data(setup.hostAccount.session, { action: "readExchange", trackId: "", id });
-    assert.deepEqual((await data(setup.guestAccount.session)).readExchangeIds, []);
-    guest.send(reply);
-    const hostData = await data(setup.hostAccount.session);
-    assert.deepEqual(hostData.readExchangeIds, [id]); assert.equal(hostData.onlineExchanges.length, 1);
+    await data(setup.guestAccount.session, { action: "readExchange", trackId: "", id });
+    assert.deepEqual((await data(setup.hostAccount.session)).readExchangeIds, []);
+    host.send(offer);
+    const guestData = await data(setup.guestAccount.session);
+    assert.deepEqual(guestData.readExchangeIds, [id]); assert.equal(guestData.onlineExchanges.length, 1);
   } finally { if (host.socket.readyState === WebSocket.OPEN) host.send({ type: "leave" }); host.close(); guest.close(); }
 });

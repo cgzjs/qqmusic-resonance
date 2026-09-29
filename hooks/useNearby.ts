@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
-import type { NearbySnapshot } from "@/lib/resonance/nearby-protocol";
+import type { NearbySnapshot, SessionTicket } from "@/lib/resonance/nearby-protocol";
 import { accountHeaders, type HostSession } from "@/lib/resonance/host-protocol";
 import { demoHost } from "@/lib/resonance/demo-host";
 
 const messages: Record<string, string> = {
-  AUTH_EXPIRED: "宿主授权已失效，请重新读取登录状态。", ALREADY_DISCOVERING: "当前账号已在另一页开启发现；异常离线状态最多保留 30 秒。",
-  SESSION_EXPIRED: "发现已暂停，请重新开启。", UNAVAILABLE: "对方已离开，试试其他音乐吧。",
-  BUSY: "你或对方已有一份待处理邀请，请稍后再试。", COOLDOWN: "稍等片刻再邀请；同一听众每分钟可邀请一次。",
-  INVITE_EXPIRED: "邀请已失效，请查看最新状态。", AREA_FULL: "当前听众较多，请稍后再试。",
-  FORBIDDEN: "这份邀请不能由你处理。",
+  AUTH_EXPIRED: "登录已过期，请重新登录。", ALREADY_DISCOVERING: "已在另一个页面打开，请先关掉那边",
+  SESSION_EXPIRED: "连接超时，已自动隐身", UNAVAILABLE: "TA 已离开",
+  BUSY: "TA 正在和别人一起听", COOLDOWN: "太快啦，稍等再试",
+  AREA_FULL: "附近人太多，稍后再试", CONNECT_FAILED: "没连上，请重试",
 };
 
 const subscribeNetwork = (notify: () => void) => {
@@ -21,8 +19,18 @@ const subscribeNetwork = (notify: () => void) => {
 const readOnline = () => navigator.onLine;
 const serverOnline = () => true;
 
+const readActiveRoom = (accountId: string) => {
+  try {
+    const roomId = sessionStorage.getItem(`resonance.nearby-room.${accountId}.active`);
+    return roomId && sessionStorage.getItem(`resonance.nearby-room.${accountId}.${roomId}`) ? roomId : null;
+  } catch { return null; }
+};
+
 export function useNearby(session: HostSession) {
-  const router = useRouter();
+  // 一起听在附近页原地进行；刷新后从会话存储恢复同一个房间。
+  const [room, setRoom] = useState<string | null>(() => readActiveRoom(session.accountId));
+  // 本次跟听的凭据（刷新恢复时没有，只用于提醒被跟的一方）。
+  const [joined, setJoined] = useState<SessionTicket | null>(null);
   const [snapshot, setSnapshot] = useState<NearbySnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,25 +45,42 @@ export function useNearby(session: HostSession) {
   const tokenRef = useRef<string | null>(null);
   const pendingRef = useRef(false);
   const mountedRef = useRef(true);
-  const enteringRef = useRef(false);
+  const enteringRef = useRef(room !== null);
 
-  const enterSession = useCallback((next: NearbySnapshot) => {
-    if (!next.ticket || enteringRef.current) return;
+  // 邀请人直接进入等待；房主仅在主动接受后进入。
+  const enterSession = useCallback((next: NearbySnapshot, accepted = false) => {
+    if (!next.ticket || enteringRef.current || (next.ticket.role === "host" && !accepted)) return false;
+    const prefix = `resonance.nearby-room.${session.accountId}.`;
     try {
-      sessionStorage.setItem(`resonance.nearby-room.${session.accountId}.${next.ticket.roomId}`, next.ticket.token);
-      enteringRef.current = true;
-      router.push(`/room/${next.ticket.roomId}`);
-    } catch { setError("浏览器无法保存本次会话，请允许此站点使用会话存储后重试。"); }
-  }, [router, session.accountId]);
+      sessionStorage.setItem(prefix + next.ticket.roomId, next.ticket.token);
+      sessionStorage.setItem(`${prefix}active`, next.ticket.roomId);
+    } catch { setError("请允许浏览器保存网站数据"); return false; }
+    enteringRef.current = true;
+    const token = tokenRef.current;
+    epoch.current++; tokenRef.current = null; readyRef.current = false;
+    if (token) void fetch("/api/nearby/stop", { method: "POST", headers: { "Content-Type": "application/json", ...accountHeaders(session), Authorization: `Bearer ${token}` }, body: "{}", keepalive: true }).catch(() => {});
+    setSnapshot(null); setReady(false); setError(null); setJoined(next.ticket); setRoom(next.ticket.roomId);
+    return true;
+  }, [session]);
+
+  const leaveSession = useCallback(() => {
+    const prefix = `resonance.nearby-room.${session.accountId}.`;
+    try {
+      const active = sessionStorage.getItem(`${prefix}active`);
+      if (active) sessionStorage.removeItem(prefix + active);
+      sessionStorage.removeItem(`${prefix}active`);
+    } catch { /* 内存状态照样退出。 */ }
+    enteringRef.current = false; setJoined(null); setRoom(null);
+  }, [session.accountId]);
 
   const request = useCallback(async function perform(action: string, body?: object) {
     if (action === "stop") {
       const token = tokenRef.current;
       epoch.current++; tokenRef.current = null; readyRef.current = false;
       setSnapshot(null); setReady(false);
-      setError(navigator.onLine ? null : "已暂停发现；服务器上的离线状态最多保留 30 秒。");
+      setError(navigator.onLine ? null : "已隐身，约半分钟后完全生效");
       if (token) void fetch("/api/nearby/stop", { method: "POST", headers: { "Content-Type": "application/json", ...accountHeaders(session), Authorization: `Bearer ${token}` }, body: "{}", keepalive: true }).catch(() => {
-        if (mountedRef.current && !tokenRef.current) setError("已暂停发现；服务器上的离线状态最多保留 30 秒。");
+        if (mountedRef.current && !tokenRef.current) setError("已隐身，约半分钟后完全生效");
       });
       return;
     }
@@ -69,7 +94,7 @@ export function useNearby(session: HostSession) {
       finally { queued.current = false; }
     }
     if (!mountedRef.current || startedEpoch !== epoch.current || !navigator.onLine) return;
-    if (["invite", "respond", "track"].includes(action) && (!readyRef.current || Date.now() - confirmedAt.current > 8000)) return;
+    if (["follow", "track"].includes(action) && (!readyRef.current || Date.now() - confirmedAt.current > 8000)) return;
     pendingRef.current = true;
     if (action !== "state") setBusy(true);
     const controller = new AbortController();
@@ -88,18 +113,18 @@ export function useNearby(session: HostSession) {
       if (!response.ok) {
         if (result.error === "AUTH_EXPIRED") demoHost.expire();
         if (response.status === 401) { tokenRef.current = null; setSnapshot(null); }
-        throw new Error(messages[result.error ?? ""] ?? "暂时无法完成操作，请重试。");
+        throw new Error(messages[result.error ?? ""] ?? "操作失败，请重试");
       }
       confirmedAt.current = Date.now();
       serverOffset.current = Number.isFinite(result.serverTime) ? result.serverTime - confirmedAt.current : 0;
       readyRef.current = true; setReady(true); setNow(Date.now() + serverOffset.current);
       setError(null);
       if (result.token) tokenRef.current = result.token;
-      setSnapshot(result); enterSession(result);
+      if (!enterSession(result, action === "accept")) setSnapshot(result);
     } catch (reason) {
       if (mountedRef.current && startedEpoch === epoch.current) {
         readyRef.current = false; setReady(false);
-        setError(reason instanceof Error && reason.name !== "AbortError" && reason.name !== "TypeError" ? reason.message : action === "start" ? "尚未确认是否开启成功，请稍后重试；未恢复的发现会在 30 秒后自动暂停。" : "连接暂时中断，正在确认最新状态；暂不可发送或回应邀请。");
+        setError(reason instanceof Error && reason.name !== "AbortError" && reason.name !== "TypeError" ? reason.message : action === "start" ? "暂未连上，请稍后再试" : "连接不稳，正在重连…");
       }
     } finally {
       clearTimeout(deadline); pendingRef.current = false;
@@ -118,11 +143,11 @@ export function useNearby(session: HostSession) {
       if (tokenRef.current && Date.now() - confirmedAt.current > 8000) { readyRef.current = false; setReady(false); }
     }, 1000);
     const invalidate = () => { epoch.current++; readyRef.current = false; setReady(false); };
-    const offline = () => { invalidate(); setError("网络已断开，恢复连接后确认发现和邀请状态。"); };
+    const offline = () => { invalidate(); setError("网络已断开，连上后自动恢复"); };
     const restore = () => {
       if (document.visibilityState === "hidden" || enteringRef.current) return;
       invalidate();
-      if (tokenRef.current) { setError("正在确认最新发现状态…"); void request("state"); }
+      if (tokenRef.current) { setError("正在刷新附近…"); void request("state"); }
       else if (navigator.onLine) setError(null);
     };
     const stopPresence = () => {
@@ -144,5 +169,5 @@ export function useNearby(session: HostSession) {
       document.removeEventListener("visibilitychange", restore);
     };
   }, [request, session]);
-  return { snapshot, busy, error, ready, online, now, request, enterSession };
+  return { snapshot, busy, error, ready, online, now, room, joined, request, leaveSession };
 }

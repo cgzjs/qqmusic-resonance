@@ -49,9 +49,9 @@ test("an ended snapshot stays at duration instead of rewinding to the initial an
   assert.equal(playbackPosition(ended, now + 1000, 24), 24);
 });
 
-test("reaction protocol accepts only fixed kinds, valid IDs and timestamped track context", () => {
-  const valid = { type: "reaction", id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", kind: "wave", trackId: "demo-night", sentAt: now };
+test("reaction protocol accepts only “heart”, valid IDs and timestamped track context", () => {
+  const valid = { type: "reaction", id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", kind: "heart", trackId: "demo-night", sentAt: now };
   assert.deepEqual(parseRoomMessage(JSON.stringify({ ...valid, from: "host" })), valid);
   assert.deepEqual(parseRoomMessage(JSON.stringify({ type: "reaction-received", id: valid.id })), { type: "reaction-received", id: valid.id });
-  for (const bad of [{ ...valid, kind: "arbitrary-html" }, { ...valid, sentAt: null }, { ...valid, id: "bad" }, { ...valid, trackId: "x".repeat(65) }, { type: "reaction-received", id: "bad" }]) assert.equal(parseRoomMessage(JSON.stringify(bad)), null);
+  for (const bad of [{ ...valid, kind: "arbitrary-html" }, { ...valid, kind: "wave" }, { ...valid, sentAt: null }, { ...valid, id: "bad" }, { ...valid, trackId: "x".repeat(65) }, { type: "reaction-received", id: "bad" }]) assert.equal(parseRoomMessage(JSON.stringify(bad)), null);
 });

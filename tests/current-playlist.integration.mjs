@@ -54,16 +54,13 @@ test("current playlist: long positions, all tracks, reconnect, natural end and d
     const offer = host.command("offer", { trackId: tracks[0].id });
     const offered = await host.wait(event => event.requestId === offer.id);
     assert.equal(offered.error, undefined);
-    await guest.wait(event => event.room?.exchange?.id === offer.id);
-    const reply = guest.command("respond", { exchangeId: offer.id, trackId: tracks[1].id });
-    const completed = await guest.wait(event => event.requestId === reply.id);
-    assert.equal(completed.error, undefined);
-    assert.equal(completed.room.exchange.status, "completed");
-    guest.send(reply);
+    const received = await guest.wait(event => event.room?.exchange?.id === offer.id);
+    assert.equal(received.room.exchange.status, "completed");
+    host.send(offer);
     const [hostData, guestData] = await Promise.all([waitForRecords(base, setup.hostAccount), waitForRecords(base, setup.guestAccount)]);
     assert.equal(hostData.onlineExchanges[0].id, guestData.onlineExchanges[0].id);
     assert.equal(hostData.onlineExchanges[0].sentTrackId, tracks[0].id);
-    assert.equal(hostData.onlineExchanges[0].receivedTrackId, tracks[1].id);
+    assert.equal(guestData.onlineExchanges[0].receivedTrackId, tracks[0].id);
   } finally {
     if (host.socket.readyState === WebSocket.OPEN) host.send({ type: "leave" });
     host.close(); guest.close();

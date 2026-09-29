@@ -47,3 +47,20 @@ test("invalid IDs, missing assets, corrupt audio and escaped paths do not overwr
     assert.equal(await readFile(join(root, "lib/resonance/catalog.generated.json"), "utf8"), before);
   }
 });
+test("cover palettes are validated for contrast and never change the catalog version", async () => {
+  const root = await workspace(); await configure(root, [wav]);
+  const fallback = await preparePlaylist(root);
+  assert.deepEqual(Object.keys(fallback.tracks[0].palette), ["dark", "light"]);
+  assert.equal(fallback.tracks[0].palette.dark.accent, "#6feee1");
+  assert.notEqual(fallback.tracks[0].palette.light.accent, "#6feee1", "a pale accent is darkened for the light appearance");
+  const palette = { dark: { base: "#0f1c26", accent: "#f2d28a", ink: "#f5f3ef" }, light: { base: "#eef3f6", accent: "#7a5a14", ink: "#13232e" } };
+  await configure(root, [{ ...wav, palette }]);
+  const declared = await preparePlaylist(root);
+  assert.deepEqual(declared.tracks[0].palette, palette);
+  assert.equal(declared.catalogVersion, fallback.catalogVersion);
+  const before = await readFile(join(root, "lib/resonance/catalog.generated.json"), "utf8");
+  for (const invalid of [{ ...palette, dark: { ...palette.dark, accent: "#1f2c36" } }, { ...palette, light: { base: "#eef3f6", ink: "#13232e" } }, "#ffffff", null]) {
+    await configure(root, [{ ...wav, palette: invalid }]); await assert.rejects(preparePlaylist(root));
+    assert.equal(await readFile(join(root, "lib/resonance/catalog.generated.json"), "utf8"), before);
+  }
+});

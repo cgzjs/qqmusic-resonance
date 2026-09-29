@@ -1,17 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Heart, Headphones, Music2, Play, Radio, X } from "lucide-react";
+import { Fragment, useState, type CSSProperties } from "react";
+import { ArrowLeftRight, Clock3, Gift, Headphones, Heart, Play, Radar, Radio, X, type LucideIcon } from "lucide-react";
 import { AlbumTile } from "@/components/resonance/AlbumTile";
-import { Button } from "@/components/ui/button";
-import { sceneLabels } from "@/lib/resonance/demo-data";
 import type { AudioTrack, MusicLibrary } from "@/lib/resonance/types";
 import { findCatalogTrack } from "@/lib/resonance/catalog";
 import type { OnlineExchangeRecord } from "@/lib/resonance/exchange-protocol";
-import { receivedSongs, exchangesOnDay, type ReceivedSong } from "@/lib/resonance/received-songs";
-import { ReceivedSongs } from "./ReceivedSongs";
+import { exchangesOnDay, type ReceivedSong } from "@/lib/resonance/received-songs";
+import { ReceivedSongs, clockTime, dayLabel } from "./ReceivedSongs";
 
-export type JourneyTab = "history" | "received" | "favorites" | "later";
+export type JourneyTab = "history" | "songs";
 
 type JourneySummaryProps = {
   accountBacked?: boolean;
@@ -28,42 +26,114 @@ type JourneySummaryProps = {
   onTabChange?: (tab: JourneyTab) => void;
 };
 
-const eventLabels = { discover: "遇见", listen: "试听", exchange: "交换" };
+const eventVerbs = { discover: "遇见", listen: "试听", exchange: "交换" };
+const eventIcons: Record<"discover" | "listen" | "exchange" | "online", LucideIcon> = { discover: Radar, listen: Headphones, exchange: ArrowLeftRight, online: Radio };
+const trackLabel = (track: AudioTrack | undefined) => track?.available ? `试听 ${track.track}` : `歌曲已移除 ${track?.track ?? "未知歌曲"}`;
 
+/**
+ * “我的”只分两栏：足迹（上面是 TA 送你的歌，下面是完整时间线）和收藏与待听。
+ * 收藏是封面墙，待听是紧凑队列。
+ */
 export function JourneySummary({ library, onPlayTrack, onRemoveFavorite, onRemoveLater, onReturn, accountBacked = false, onlineHistory = [], onlineExchanges = [], received = [], onReadExchange, initialTab = "history", onTabChange }: JourneySummaryProps) {
   const [tab, setTab] = useState<JourneyTab>(initialTab);
   const unread = received.filter(item => item.unread).length;
   const [limit, setLimit] = useState(20);
   const today = new Date().toDateString();
-  const todayEvents = library.events.filter(event => new Date(event.createdAt).toDateString() === today);
-  const completedExchanges = receivedSongs({ events: library.events, onlineExchanges, readExchangeIds: [] });
-  const stats = [
-    { label: "今日遇见", value: new Set(todayEvents.filter(event => event.type === "discover").map(event => event.listenerId)).size, icon: Headphones },
-    { label: "今日交换", value: exchangesOnDay(completedExchanges), icon: Music2 },
-    { label: "我的收藏", value: library.favoriteIds.length, icon: Heart },
-  ];
-  const ids = tab === "favorites" ? library.favoriteIds : library.listenLaterIds;
+  // 一起听时的送歌是单向的：gift 标出是送给 TA 还是 TA 送的；旧版交换两首都有，按一对显示。
   const history = [...new Map([
-    ...onlineExchanges.map(event => ({ id: `online:${event.roomId}:${event.id}`, type: "exchange" as const, trackId: event.sentTrackId, listenerId: "", scene: null, createdAt: new Date(event.completedAt).toISOString(), receivedTrackId: event.receivedTrackId, origin: "online-exchange" as const })),
-    ...library.events.filter(event => event.type !== "exchange" || event.receivedTrackId).map(event => ({ ...event, id: `demo:${event.id}`, origin: "demo" as const })),
-    ...onlineHistory.map(event => ({ id: `listen:${event.id}`, type: "listen" as const, trackId: event.trackId, listenerId: "", scene: null, createdAt: new Date(event.listenedAt).toISOString(), receivedTrackId: undefined, origin: "online" as const })),
+    ...onlineExchanges.filter(event => event.sentTrackId || event.receivedTrackId).map(event => ({ id: `online:${event.roomId}:${event.id}`, type: "exchange" as const, trackId: (event.sentTrackId ?? event.receivedTrackId)!, listenerId: "", scene: null, createdAt: new Date(event.completedAt).toISOString(), receivedTrackId: event.sentTrackId ? event.receivedTrackId : undefined, gift: !event.sentTrackId ? "received" as const : !event.receivedTrackId ? "sent" as const : undefined, origin: "online-exchange" as const })),
+    ...library.events.map(event => ({ ...event, id: `demo:${event.id}`, gift: event.type === "exchange" && !event.receivedTrackId ? "sent" as const : undefined, origin: "demo" as const })),
+    ...onlineHistory.map(event => ({ id: `listen:${event.id}`, type: "listen" as const, trackId: event.trackId, listenerId: "", scene: null, createdAt: new Date(event.listenedAt).toISOString(), receivedTrackId: undefined, gift: undefined, origin: "online" as const })),
   ].map(event => [event.id, event])).values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const stats = [
+    { label: "今日一起听", value: onlineHistory.filter(event => new Date(event.listenedAt).toDateString() === today).length },
+    { label: "今日送歌", value: exchangesOnDay(history.filter(event => event.type === "exchange").map(event => ({ receivedAt: Date.parse(event.createdAt) }))) },
+    { label: "我的收藏", value: library.favoriteIds.length },
+  ];
+  // 今天经过的歌（交换取收到的那首），叠成一摞唱片放在页首。
+  const todayCovers = [...new Map(history.filter(event => new Date(event.createdAt).toDateString() === today).map(event => findCatalogTrack(event.receivedTrackId ?? event.trackId)).filter(track => track !== undefined).map(track => [track.id, track])).values()].slice(0, 4);
+  const later = library.listenLaterIds;
+  const tabs = [
+    { id: "history", label: "足迹", count: unread },
+    { id: "songs", label: "收藏与待听", count: library.favoriteIds.length + later.length },
+  ] as const;
+  const shown = history.slice(0, limit);
+  const songList = (ids: string[], kind: "favorites" | "later") => kind === "favorites"
+    ? <ul className="tp-wall">{ids.map(id => {
+      const track = findCatalogTrack(id);
+      return <li key={id} data-available={!!track?.available}>
+        <button type="button" className="tp-wall-play" disabled={!track?.available} onClick={() => track?.available && onPlayTrack(track)} aria-label={trackLabel(track)}>
+          <AlbumTile coverUrl={track?.coverUrl} accent={track?.accent ?? "#8ca49a"} size="md" />
+          <strong>{track?.track ?? "已移除的歌曲"}</strong><small>{track?.available ? track.artist : "已从歌单移除"}</small>
+        </button>
+        <button type="button" className="tp-wall-remove" aria-label={`取消收藏 ${track?.track ?? id}`} onClick={() => onRemoveFavorite(id)}><X size={14} aria-hidden="true" /></button>
+      </li>;
+    })}</ul>
+    : <ul className="tp-queue">{ids.map(id => {
+      const track = findCatalogTrack(id);
+      return <li key={id}>
+        <button type="button" className="tp-track" disabled={!track?.available} onClick={() => track?.available && onPlayTrack(track)} aria-label={trackLabel(track)}>
+          <AlbumTile coverUrl={track?.coverUrl} accent={track?.accent ?? "#8ca49a"} size="sm" />
+          <span className="tp-track-copy"><strong>{track?.track ?? "已移除的歌曲"}</strong><small>{track?.available ? track.artist : "已从歌单移除，可移出此列表"}</small></span>
+        </button>
+        <button type="button" className="tp-icon-btn" aria-label={`移出待听 ${track?.track ?? id}`} onClick={() => onRemoveLater(id)}><X size={16} aria-hidden="true" /></button>
+      </li>;
+    })}</ul>;
+
   return (
-    <section className="screen-view journey-view">
-      <header className="journey-header"><h2>我的音乐足迹</h2></header>
-      <div className="stat-grid">{stats.map(({ label, value, icon: Icon }) => <article key={label}><Icon aria-hidden="true" size={17} /><span>{label}</span><strong>{value}</strong></article>)}</div>
-      <div className="library-tabs" role="group" aria-label="音乐记录分类">{([{ id: "history", label: "足迹" }, { id: "received", label: "收到的歌" }, { id: "favorites", label: `收藏 ${library.favoriteIds.length}` }, { id: "later", label: `待听 ${library.listenLaterIds.length}` }] as const).map(item => <button type="button" key={item.id} aria-pressed={tab === item.id} aria-label={item.id === "received" && unread ? `收到的歌，${unread} 首未读` : item.label} onClick={() => { setTab(item.id); onTabChange?.(item.id); }}>{item.label}{item.id === "received" && unread > 0 && <span className="unread-count" aria-hidden="true">{unread}</span>}</button>)}</div>
-      {tab === "received" ? <ReceivedSongs items={received} onRead={onReadExchange ?? (() => Promise.resolve(false))} onPlay={onPlayTrack} /> : tab === "history" ? history.length === 0 ? <div className="library-empty"><Radio aria-hidden="true" /><h3>还没有音乐足迹</h3><p>去雷达发现一首歌，记录会从这里开始。</p></div> : <div className="journey-events">{history.slice(0, limit).map(event => {
-        const track = findCatalogTrack(event.type === "exchange" ? event.receivedTrackId! : event.trackId);
-        const sent = findCatalogTrack(event.trackId);
-        const date = new Date(event.createdAt);
-        return <article className="journey-event" key={event.id}><div className="journey-event__meta"><span>{event.origin === "online-exchange" ? "在线交换" : event.origin === "online" ? "在线同频" : `${eventLabels[event.type]} · ${event.scene ? sceneLabels[event.scene] : ""}`}</span><time dateTime={event.createdAt}>{date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })} {date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}</time></div><button type="button" className="saved-track" disabled={!track?.available} onClick={() => track?.available && onPlayTrack(track)} aria-label={track?.available ? `试听 ${track.track}` : `歌曲已移除 ${track?.track ?? "未知歌曲"}`}><AlbumTile coverUrl={track?.coverUrl} accent={track?.accent ?? "#8ca49a"} size="sm" /><span><strong>{track?.track ?? "已移除的歌曲"}</strong><small>{!track?.available ? "歌曲已从歌单移除，记录仍保留" : event.type === "exchange" ? `送出《${sent?.track ?? event.trackId}》，收到这首` : track?.artist}</small></span><Play size={17} aria-hidden="true" /></button></article>;
-      })}{history.length > limit && <Button variant="ghost" onClick={() => setLimit(value => value + 20)}>显示更多记录</Button>}</div> : ids.length === 0 ? <div className="library-empty"><Heart aria-hidden="true" /><h3>{tab === "favorites" ? "还没有收藏" : "待听列表为空"}</h3><p>{tab === "favorites" ? "试听时收藏，或留住交换收到的歌。" : "收到歌曲时，可以先加入稍后再听。"}</p></div> : <div className="saved-tracks">{ids.map(id => {
-        const track = findCatalogTrack(id);
-        return <div className="saved-track-row" key={id}><button type="button" className="saved-track" disabled={!track?.available} onClick={() => track?.available && onPlayTrack(track)} aria-label={track?.available ? `试听 ${track.track}` : `歌曲已移除 ${track?.track ?? "未知歌曲"}`}><AlbumTile coverUrl={track?.coverUrl} accent={track?.accent ?? "#8ca49a"} size="sm" /><span><strong>{track?.track ?? "已移除的歌曲"}</strong><small>{track?.available ? track.artist : "已从歌单移除，可移出此列表"}</small></span><Play size={17} aria-hidden="true" /></button><button className="remove-saved" type="button" aria-label={`${tab === "favorites" ? "取消收藏" : "移出待听"} ${track?.track ?? id}`} onClick={() => tab === "favorites" ? onRemoveFavorite(id) : onRemoveLater(id)}><X size={16} aria-hidden="true" /></button></div>;
-      })}</div>}
-      {onReturn && <Button className="primary-action journey-return" onClick={onReturn}>回到音乐雷达</Button>}
-      <p className="journey-disclaimer">{accountBacked ? "保存到当前账号" : "保存在这台设备"}</p>
+    <section className="tp-journey">
+      <header className="tp-today">
+        <div className="tp-stack" aria-hidden="true" data-count={todayCovers.length}>
+          {todayCovers.length ? todayCovers.map((track, index) => <span key={track.id} style={{ "--i": index, "--n": todayCovers.length } as CSSProperties}><AlbumTile coverUrl={track.coverUrl} accent={track.accent} size="md" /></span>) : <span className="tp-stack-empty" />}
+        </div>
+        <div className="tp-today-copy">
+          <h2>我的音乐足迹</h2>
+          <div className="stat-grid tp-stats">{stats.map(({ label, value }) => <article key={label} data-zero={value === 0}><strong>{value}</strong><span>{label}</span></article>)}</div>
+        </div>
+      </header>
+
+      <div className="tp-segments" role="group" aria-label="音乐记录分类">{tabs.map(item => {
+        const label = item.id === "history" ? unread ? `足迹，${unread} 首送你的歌未读` : item.label : item.count ? `${item.label} ${item.count}` : item.label;
+        return <button type="button" key={item.id} aria-pressed={tab === item.id} aria-label={label} onClick={() => { setTab(item.id); onTabChange?.(item.id); }}>
+          {item.label}{item.id === "history" ? unread > 0 && <b className="tp-badge" aria-hidden="true">{unread}</b> : item.count > 0 && <small aria-hidden="true">{item.count}</small>}
+        </button>;
+      })}</div>
+
+      <div className="tp-journey-body">
+        {tab === "history" ? <>
+          {received.length > 0 && <section className="tp-journey-section" aria-labelledby="journey-received"><h3 id="journey-received" className="tp-section-head">TA 送你的{unread > 0 && <small>{unread} 首未读</small>}</h3><ReceivedSongs items={received} initialLimit={3} onRead={onReadExchange ?? (() => Promise.resolve(false))} onPlay={onPlayTrack} /></section>}
+          {history.length === 0
+            ? <div className="tp-empty"><Radar aria-hidden="true" /><h3>还没有音乐足迹</h3><p>去附近发现一首歌，记录会从这里开始。</p>{onReturn && <button type="button" className="tp-btn tp-btn--quiet" onClick={onReturn}>去附近看看</button>}</div>
+            : <section className="tp-journey-section" aria-labelledby="journey-timeline">{received.length > 0 && <h3 id="journey-timeline" className="tp-section-head">全部足迹</h3>}<div className="tp-timeline">{shown.map((event, index) => {
+              const gift = event.gift;
+              const exchange = event.type === "exchange" && !!event.receivedTrackId;
+              const track = findCatalogTrack(event.receivedTrackId ?? event.trackId);
+              const sent = findCatalogTrack(event.trackId);
+              const date = new Date(event.createdAt);
+              const newDay = index === 0 || date.toDateString() !== new Date(shown[index - 1].createdAt).toDateString();
+              const kind = event.origin === "online" ? "online" : event.type;
+              const Icon = gift ? Gift : eventIcons[kind];
+              const verb = eventVerbs[event.type];
+              const what = gift === "sent" ? "一起听时送给 TA" : gift === "received" ? "一起听时 TA 送你" : event.origin === "online-exchange" ? "一起听时交换" : event.origin === "online" ? "和 TA 一起听" : verb;
+              return <Fragment key={event.id}>{newDay && <h3 className="tp-day">{dayLabel(date)}</h3>}<article className="journey-event tp-event" data-kind={kind}>
+                <span className="tp-node" aria-hidden="true"><Icon size={14} strokeWidth={2} /></span>
+                <p className="tp-event-meta"><span>{what}</span><time dateTime={event.createdAt}>{clockTime(date)}</time></p>
+                <button type="button" className="tp-track" disabled={!track?.available} onClick={() => track?.available && onPlayTrack(track)} aria-label={trackLabel(track)}>
+                  {exchange ? <span className="tp-pair"><AlbumTile coverUrl={sent?.coverUrl} accent={sent?.accent ?? "#8ca49a"} size="sm" /><ArrowLeftRight size={12} aria-hidden="true" /><AlbumTile coverUrl={track?.coverUrl} accent={track?.accent ?? "#8ca49a"} size="sm" /></span> : <AlbumTile coverUrl={track?.coverUrl} accent={track?.accent ?? "#8ca49a"} size="sm" />}
+                  <span className="tp-track-copy"><strong>{track?.track ?? "已移除的歌曲"}</strong><small>{!track?.available ? "歌曲已从歌单移除，记录仍保留" : exchange ? `送出《${sent?.track ?? event.trackId}》，收到这首` : track.artist}</small></span>
+                  <Play className="tp-track-go" size={16} aria-hidden="true" />
+                </button>
+              </article></Fragment>;
+            })}{history.length > limit && <button type="button" className="tp-btn tp-btn--quiet tp-more" onClick={() => setLimit(value => value + 20)}>显示更多记录</button>}</div></section>}
+        </>
+          : <>
+            <section className="tp-journey-section" aria-labelledby="journey-favorites"><h3 id="journey-favorites" className="tp-section-head"><Heart size={14} aria-hidden="true" />收藏{library.favoriteIds.length > 0 && <small>{library.favoriteIds.length}</small>}</h3>
+              {library.favoriteIds.length ? songList(library.favoriteIds, "favorites") : <p className="tp-section-empty">试听时收藏，或留住 TA 送你的歌</p>}</section>
+            <section className="tp-journey-section" aria-labelledby="journey-later"><h3 id="journey-later" className="tp-section-head"><Clock3 size={14} aria-hidden="true" />待听{later.length > 0 && <small>{later.length}</small>}</h3>
+              {later.length ? songList(later, "later") : <p className="tp-section-empty">收到喜欢的歌，可以先放进这里稍后再听</p>}</section>
+          </>}
+      </div>
+      <p className="tp-footnote">{accountBacked ? "记录保存在当前账号" : "记录保存在这台设备"}</p>
     </section>
   );
 }

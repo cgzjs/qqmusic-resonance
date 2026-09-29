@@ -9,13 +9,22 @@ import { AlbumTile } from "@/components/resonance/AlbumTile";
 import "@/app/landing.css";
 import { AppearanceToggle } from "./Appearance";
 
+// seconds：未手动选择时，控制台按这个时长依次演示三章。
 const chapters = [
-  { name: "discover", label: "发现", icon: Crosshair },
-  { name: "sync", label: "跟听", icon: Headphones },
-  { name: "exchange", label: "交换", icon: ArrowDownUp },
+  { name: "discover", label: "发现", icon: Crosshair, seconds: 12 },
+  { name: "sync", label: "跟听", icon: Headphones, seconds: 9 },
+  { name: "exchange", label: "交换", icon: ArrowDownUp, seconds: 8 },
 ];
 
 const signal = nearbyListeners[0];
+// 扫描线 18s 转一圈，起点朝向 (335, 57)；每个听众点的延迟 = 扫描线转到它所需的时间，扫到时亮一下。
+const sweepDelay = (x: number, y: number) => {
+  const turn = (Math.atan2(y - 145, x - 240) - Math.atan2(57 - 145, 335 - 240)) / (2 * Math.PI);
+  return `${((turn + 1) % 1 * 18).toFixed(2)}s`;
+};
+const radarNodes = [[149, 130], [301, 229], [204, 225]].map(([x, y]) => ({ x, y, delay: sweepDelay(x, y) }));
+const matchDelay = sweepDelay(297, 77);
+const chapterStatus = [`${signal.distanceLabel} · ${signal.similarity}% 同频`, "与 TA 同步播放中", "匿名交换，各送一首"];
 const bars = Array.from({ length: 48 }, (_, index) => Math.round(12 + Math.abs(Math.sin(index * .73) * Math.cos(index * .21)) * 78));
 // Interpolate the illustrative envelope into fine, asymmetric audio samples.
 // Integer arithmetic keeps server/client SVG attributes identical.
@@ -86,7 +95,8 @@ function SignalDisplay({ chapterIndex }: { chapterIndex: number }) {
             <g className="signal-radar__grid"><path d="M240 12v266M45 145h390" /><circle cx="240" cy="145" r="45" /><circle cx="240" cy="145" r="88" /><circle cx="240" cy="145" r="130" /><path d="m145 50 190 190m0-190L145 240" strokeDasharray="2 7" /></g>
             <g className="signal-radar__sweep"><path d="M240 145 335 57" /><path d="M240 145 323 44" opacity=".4" /><path d="M240 145 309 34" opacity=".15" /></g>
             <g className="signal-radar__connection"><path d="M240 145 297 77" strokeDasharray="3 5" /><circle cx="297" cy="77" r="13" /><circle cx="297" cy="77" r="4" fill="currentColor" /></g>
-            <g className="signal-radar__nodes"><circle cx="149" cy="130" r="4" /><circle cx="301" cy="229" r="4" /><circle cx="204" cy="225" r="4" /></g>
+            <g className="signal-radar__nodes">{radarNodes.map(node => <circle key={node.x} cx={node.x} cy={node.y} r="4" style={{ animationDelay: node.delay }} />)}</g>
+            <g className="signal-radar__pings">{[...radarNodes, { x: 297, y: 77, delay: matchDelay }].map(node => <circle key={node.x} cx={node.x} cy={node.y} r="5" style={{ animationDelay: node.delay }} />)}</g>
             <circle className="signal-radar__you" cx="240" cy="145" r="5" /><text x="253" y="151" className="signal-radar__label">YOU</text>
             <text x="317" y="82" className="signal-radar__active-label">{signal.similarity}%</text>
           </svg>
@@ -94,7 +104,7 @@ function SignalDisplay({ chapterIndex }: { chapterIndex: number }) {
         {chapterIndex === 1 && <SharedWave />}
         {chapterIndex === 2 && <ExchangePreview />}
       </div>
-      <div className="signal-track"><div className="signal-track__icon">{chapterIndex === 2 ? <ArrowDownUp size={23} strokeWidth={1.4} aria-hidden="true" /> : <AudioLines size={27} strokeWidth={1.4} aria-hidden="true" />}</div><div><h2>{chapterIndex === 2 ? "交换喜欢的歌" : signal.track}</h2><p>{chapterIndex === 2 ? `${signal.suggestions[0].artist} · ${signal.suggestions[2].artist}` : signal.artist}</p></div></div>
+      <div className="signal-track"><div className="signal-track__icon">{chapterIndex === 2 ? <ArrowDownUp size={23} strokeWidth={1.4} aria-hidden="true" /> : <AudioLines size={27} strokeWidth={1.4} aria-hidden="true" />}</div><div><span>{chapterStatus[chapterIndex]}</span><h2>{chapterIndex === 2 ? "交换喜欢的歌" : signal.track}</h2><p>{chapterIndex === 2 ? `${signal.suggestions[0].artist} · ${signal.suggestions[2].artist}` : signal.artist}</p></div></div>
       <div className="signal-console__bottom">{chapterIndex === 0 ? <Spectrum /> : <span className="signal-console__rule" aria-hidden="true" />}</div>
     </section>
   );
@@ -102,6 +112,7 @@ function SignalDisplay({ chapterIndex }: { chapterIndex: number }) {
 
 export function ResonanceLanding() {
   const [chapterIndex, setChapterIndex] = useState(0);
+  const [picked, setPicked] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
   return (
@@ -122,10 +133,10 @@ export function ResonanceLanding() {
           </div>
           <div className="terminal-preview">
             <SignalDisplay chapterIndex={chapterIndex} />
-            <nav className="terminal-chapters" aria-label="封面章节">{chapters.map((item, index) => <button key={item.name} type="button" aria-pressed={chapterIndex === index} onClick={() => setChapterIndex(index)}><item.icon size={19} strokeWidth={1.4} aria-hidden="true" /><span>{item.label}</span></button>)}</nav>
+            <nav className="terminal-chapters" aria-label="封面章节">{chapters.map((item, index) => <button key={item.name} type="button" aria-pressed={chapterIndex === index} onClick={() => { setPicked(true); setChapterIndex(index); }}><item.icon size={19} strokeWidth={1.4} aria-hidden="true" /><span>{item.label}</span>{!picked && chapterIndex === index && <i className="terminal-chapters__progress" aria-hidden="true" style={{ "--chapter-seconds": `${item.seconds}s` } as CSSProperties} onAnimationEnd={() => setChapterIndex(value => (value + 1) % chapters.length)} />}</button>)}</nav>
           </div>
         </main>
-        <span className="sr-only" aria-live="polite">{chapters[chapterIndex].label}预览</span>
+        <span className="sr-only" aria-live="polite">{picked ? `${chapters[chapterIndex].label}预览` : ""}</span>
       </div>
     </div>
   );

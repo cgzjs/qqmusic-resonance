@@ -8,11 +8,11 @@ export async function setupExchangeRoom(base, trackIds = ["demo-night", "demo-gl
   };
   const aPresence = await nearby("start", a, null, { trackId: trackIds[0] });
   const bPresence = await nearby("start", b, null, { trackId: trackIds[1] });
-  const invite = await nearby("invite", a, aPresence.token, { targetId: bPresence.self.id });
-  const accepted = await nearby("respond", b, bPresence.token, { inviteId: invite.invite.id, decision: "accept" });
-  const followed = await nearby("state", a, aPresence.token);
+  // a 跟听 b：b 是房主，a 是听众。
+  const followed = await nearby("follow", a, aPresence.token, { targetId: bPresence.self.id });
+  const hosting = await nearby("state", b, bPresence.token);
   await nearby("stop", a, aPresence.token, {}); await nearby("stop", b, bPresence.token, {});
-  return { hostAccount: b, guestAccount: a, hostTicket: accepted.ticket, guestTicket: followed.ticket };
+  return { hostAccount: b, guestAccount: a, hostTicket: hosting.ticket, guestTicket: followed.ticket };
 }
 export class ExchangePeer {
   events = []; latest = null; nextIndex = 0;

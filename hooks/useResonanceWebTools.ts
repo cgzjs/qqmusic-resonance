@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 
 import { playableListeners as nearbyListeners } from "@/lib/resonance/demo-data";
-import type { AppView, NearbyListener } from "@/lib/resonance/types";
 
 type RegisteredTool = {
   name: string;
@@ -25,13 +24,14 @@ declare global {
 }
 
 type WebToolActions = {
-  selectListener: (listener: NearbyListener) => void;
-  setView: (view: AppView) => void;
+  /** 跟一位模拟听众一起听；正在一起听时返回 false。 */
+  followListener: (listenerId: string) => boolean;
+  openJourney: () => boolean;
 };
 
-export function useResonanceWebTools({ selectListener, setView }: WebToolActions) {
-  const actions = useRef({ selectListener, setView });
-  useEffect(() => { actions.current = { selectListener, setView }; }, [selectListener, setView]);
+export function useResonanceWebTools({ followListener, openJourney }: WebToolActions) {
+  const actions = useRef({ followListener, openJourney });
+  useEffect(() => { actions.current = { followListener, openJourney }; }, [followListener, openJourney]);
   useEffect(() => {
     const context = document.modelContext;
     if (!context?.registerTool) return;
@@ -40,9 +40,9 @@ export function useResonanceWebTools({ selectListener, setView }: WebToolActions
 
     const tools: RegisteredTool[] = [
       {
-        name: "open_nearby_match",
-        title: "打开场景模拟音乐匹配",
-        description: "选择一个场景演示听众，打开模拟同频详情；不会向在线用户发出邀请。",
+        name: "listen_with_demo_listener",
+        title: "和模拟听众一起听",
+        description: "选择一位模拟听众，进入一起听；只用于演示，不会联系真实用户。",
         inputSchema: {
           type: "object",
           properties: {
@@ -59,9 +59,8 @@ export function useResonanceWebTools({ selectListener, setView }: WebToolActions
           const listenerId = (input as { listenerId?: unknown })?.listenerId;
           const listener = nearbyListeners.find((item) => item.id === listenerId);
           if (!listener) throw new Error("Unknown listenerId");
-          actions.current.selectListener(listener);
-          actions.current.setView("match");
-          return { listenerId: listener.id, track: listener.track, view: "match" };
+          if (!actions.current.followListener(listener.id)) throw new Error("Already listening together");
+          return { listenerId: listener.id, track: listener.track, view: "listening" };
         },
       },
       {
@@ -71,7 +70,7 @@ export function useResonanceWebTools({ selectListener, setView }: WebToolActions
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         annotations: { readOnlyHint: false, untrustedContentHint: false },
         execute() {
-          actions.current.setView("journey");
+          if (!actions.current.openJourney()) throw new Error("Leave the listening session first");
           return { view: "journey" };
         },
       },

@@ -62,8 +62,7 @@ test("completed exchanges survive partial account failure, room closure and Work
     host = new ExchangePeer(base, setup.hostTicket, setup.hostAccount); guest = new ExchangePeer(base, setup.guestTicket, setup.guestAccount);
     await host.wait(event => event.room?.hostConnected && event.room.guestConnected); await guest.wait(event => event.type === "welcome");
     const offer = host.command("offer", { trackId: "demo-night" }); await host.wait(event => event.requestId === offer.id);
-    const response = guest.command("respond", { exchangeId: offer.id, trackId: "demo-glass" });
-    await guest.wait(event => event.requestId === response.id);
+    await guest.wait(event => event.room?.exchange?.id === offer.id);
     const partial = await host.wait(event => event.room?.exchange?.saved.host && !event.room.exchange.saved.guest);
     assert.equal(partial.room.exchange.status, "completed");
     assert.equal((await accountData(base, setup.guestAccount)).onlineExchanges.length, 0);
@@ -76,7 +75,7 @@ test("completed exchanges survive partial account failure, room closure and Work
     const recovered = await fetch(`${base}/_test/fault`, { method: "POST", body: "{}" }); assert.equal(recovered.status, 200);
     const [hostData, guestData] = await Promise.all([waitForRecords(base, setup.hostAccount), waitForRecords(base, setup.guestAccount)]);
     assert.equal(hostData.onlineExchanges[0].id, offer.id); assert.equal(guestData.onlineExchanges[0].id, offer.id);
-    assert.equal(hostData.onlineExchanges[0].receivedTrackId, "demo-glass");
+    assert.equal(hostData.onlineExchanges[0].sentTrackId, "demo-night");
     assert.equal(guestData.onlineExchanges[0].receivedTrackId, "demo-night");
     assert.equal(hostData.onlineExchanges.length, 1); assert.equal(guestData.onlineExchanges.length, 1);
   } finally { host?.close(); guest?.close(); await runtime.dispose(); }

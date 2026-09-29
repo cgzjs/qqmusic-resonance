@@ -12,13 +12,14 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   return <ThemeProvider attribute="data-theme" storageKey="resonance.appearance" defaultTheme="dark" enableSystem={false} themes={["light", "dark"]} disableTransitionOnChange>{children}</ThemeProvider>;
 }
 
-export function AppearanceToggle() {
+/** `compact` renders the icon-only header button used on the cover-driven pages. */
+export function AppearanceToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme } = useTheme();
   const ready = useClientReady();
   const light = ready && theme === "light";
   const label = light ? "切换为夜间外观" : "切换为日间外观";
-  return <button type="button" className="appearance-toggle" disabled={!ready} aria-label={label} title={label} onClick={() => setTheme(light ? "dark" : "light")}>
-    {light ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}<span>{light ? "日间" : "夜间"}</span>
+  return <button type="button" className={compact ? "tp-icon-btn" : "appearance-toggle"} disabled={!ready} aria-label={label} title={label} onClick={() => setTheme(light ? "dark" : "light")}>
+    {light ? <Sun size={compact ? 20 : 17} aria-hidden="true" /> : <Moon size={compact ? 20 : 17} aria-hidden="true" />}{!compact && <span>{light ? "日间" : "夜间"}</span>}
   </button>;
 }
 

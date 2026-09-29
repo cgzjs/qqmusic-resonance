@@ -12,6 +12,41 @@ const text = (value, label, max = 160) => {
   return value.trim();
 };
 
+// Cover palettes drive the app backdrop. Text colours are checked against the
+// base they sit on so a new cover cannot ship unreadable secondary text.
+const HEX = /^#[0-9a-f]{6}$/i;
+const THEMES = { dark: { base: "#121416", ink: "#f4f5f6", mutedAlpha: .54 }, light: { base: "#f4f5f6", ink: "#16191c", mutedAlpha: .66 } };
+const MIN_CONTRAST = 4.5;
+const rgb = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+const toHex = channels => `#${channels.map(value => Math.round(Math.min(255, Math.max(0, value))).toString(16).padStart(2, "0")).join("")}`;
+const mix = (from, to, amount) => toHex(rgb(from).map((value, index) => value + (rgb(to)[index] - value) * amount));
+const luminance = hex => {
+  const [r, g, b] = rgb(hex).map(value => { value /= 255; return value <= .03928 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4; });
+  return .2126 * r + .7152 * g + .0722 * b;
+};
+export const contrast = (a, b) => { const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (light + .05) / (dark + .05); };
+
+function readableAccent(accent, base, towards) {
+  for (let step = 0; step <= 20; step += 1) { const candidate = mix(accent, towards, step / 20); if (contrast(candidate, base) >= MIN_CONTRAST) return candidate; }
+  return towards;
+}
+
+export function coverPalette(input, accent, id) {
+  const palette = {};
+  for (const [theme, fallback] of Object.entries(THEMES)) {
+    const value = input?.[theme];
+    const colours = value === undefined
+      ? { base: fallback.base, ink: fallback.ink, accent: readableAccent(accent, fallback.base, theme === "dark" ? "#ffffff" : "#000000") }
+      : value;
+    if (!colours || typeof colours !== "object" || !["base", "accent", "ink"].every(key => HEX.test(colours[key] ?? ""))) throw new Error(`${id} palette.${theme} 需包含六位十六进制的 base、accent、ink`);
+    const { base, ink } = colours;
+    const color = colours.accent;
+    if (contrast(ink, base) < MIN_CONTRAST || contrast(color, base) < MIN_CONTRAST || contrast(mix(base, ink, fallback.mutedAlpha), base) < MIN_CONTRAST) throw new Error(`${id} palette.${theme} 文字或强调色与底色对比度不足 ${MIN_CONTRAST}:1`);
+    palette[theme] = { base: base.toLowerCase(), accent: color.toLowerCase(), ink: ink.toLowerCase() };
+  }
+  return palette;
+}
+
 async function asset(root, value, folder) {
   const url = text(value, "素材路径", 500);
   let decoded;
@@ -57,12 +92,15 @@ export async function preparePlaylist(root = fileURLToPath(new URL("../", import
       if (![".png", ".jpg", ".jpeg", ".webp", ".svg"].includes(extname(cover.path).toLowerCase()) || cover.size > 5 * 1024 * 1024) throw new Error(`${id} 封面格式不支持或超过 5 MiB`);
       coverUrl = `${cover.url}?v=${hash(await readFile(cover.path)).slice(0, 16)}`;
     }
-    tracks.push({ id, track, artist, audioUrl: `${audio.url}?v=${revision}`, ...(coverUrl ? { coverUrl } : {}), accent, source: input.source ? text(input.source, `${id} source`) : "自备模拟歌单", duration, mimeType, byteLength: audio.size, revision, available: true });
+    if (input.palette !== undefined && (!input.palette || typeof input.palette !== "object")) throw new Error(`${id} palette 配置无效`);
+    const palette = coverPalette(input.palette, accent, id);
+    tracks.push({ id, track, artist, audioUrl: `${audio.url}?v=${revision}`, ...(coverUrl ? { coverUrl } : {}), accent, palette, source: input.source ? text(input.source, `${id} source`) : "自备模拟歌单", duration, mimeType, byteLength: audio.size, revision, available: true });
   }
   // Retain names and IDs when removed from the active playlist. No old favorite
   // is silently deleted or reassigned to a different track.
   const retired = [...new Map([...previous.retired, ...previous.tracks].filter(track => !seen.has(track.id)).map(track => [track.id, { ...track, available: false }])).values()];
-  const manifest = { version: 1, catalogVersion: hash(JSON.stringify(tracks)).slice(0, 16), tracks, retired };
+  // Palettes are presentation only; changing them must not invalidate live rooms.
+  const manifest = { version: 1, catalogVersion: hash(JSON.stringify(tracks.map(track => { const identity = { ...track }; delete identity.palette; return identity; }))).slice(0, 16), tracks, retired };
   if (write) {
     await mkdir(dirname(target), { recursive: true });
     const output = JSON.stringify(manifest, null, 2) + "\n";

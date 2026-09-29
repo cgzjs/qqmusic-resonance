@@ -1,29 +1,30 @@
 "use client";
-import { useState } from "react";
-import { Headphones, Send, Sparkles } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Headphones, Sparkles } from "lucide-react";
 import { audioTracks } from "@/lib/resonance/demo-data";
 import type { NearbyListener } from "@/lib/resonance/types";
 import type { useNearby } from "@/hooks/useNearby";
+import type { NearbyPeer } from "@/lib/resonance/nearby-protocol";
 import { AlbumTile } from "./AlbumTile";
 import { OrbitRadar } from "./OrbitRadar";
 import { BlockListenerButton } from "./ListenerSafety";
-import { MusicBackdrop } from "./MusicBackdrop";
 import type { ResonancePlayer } from "@/hooks/useResonancePlayer";
 
-type Props = { nearby: ReturnType<typeof useNearby>; currentTrackId: string | null; player?: ResonancePlayer };
-const results = { accepted: "邀请已接受，正在连接。", declined: "这次暂未同频，继续遇见。", cancelled: "邀请已结束。", expired: "邀请已到期或对方已离线。", pending: "等待回应" };
+type RadarProps = {
+  peers: NearbyPeer[]; visible: boolean; ready: boolean; online: boolean; busy: boolean; error?: string | null;
+  currentTrackId: string | null; player?: ResonancePlayer;
+  switchDisabled: boolean; onVisibleChange: () => void;
+  onFollow: (peer: NearbyPeer) => void;
+  safety?: (peer: NearbyPeer) => ReactNode;
+};
 
-export function OnlineNearbyPanel({ nearby, currentTrackId, player }: Props) {
-  const { snapshot, busy, error, ready, online, now, request, enterSession } = nearby;
+// 附近页本体：真实听众和模拟听众都用这一套，只是数据来源不同。
+export function NearbyRadar({ peers: allPeers, visible, ready, online, busy, error, currentTrackId, player, switchDisabled, onVisibleChange, onFollow, safety }: RadarProps) {
   const [selectedId, setSelectedId] = useState("");
   const [quiet, setQuiet] = useState(false);
-  const invite = snapshot?.invite;
-  const pending = invite?.status === "pending";
-  const incoming = invite?.to === snapshot?.self.id;
-  const song = audioTracks.find(track => track.id === invite?.trackId);
-  const seconds = invite && snapshot ? Math.max(0, Math.ceil((invite.expiresAt - now) / 1000)) : 0;
-  const peers = (snapshot?.peers ?? []).filter(peer => audioTracks.some(track => track.id === peer.trackId));
+  const peers = allPeers.filter(peer => audioTracks.some(track => track.id === peer.trackId));
   const selected = peers.find(peer => peer.id === selectedId) ?? peers[0];
+  const selectedTrack = selected && audioTracks.find(track => track.id === selected.trackId);
   const currentTrack = audioTracks.find(track => track.id === currentTrackId);
   const isCurrent = !!currentTrack && player?.track?.id === currentTrack.id;
   const playing = isCurrent && player?.status === "playing";
@@ -32,21 +33,36 @@ export function OnlineNearbyPanel({ nearby, currentTrackId, player }: Props) {
   const radarPeers: NearbyListener[] = visiblePeers.map((peer, index) => {
     const track = audioTracks.find(track => track.id === peer.trackId)!;
     const angle = index * Math.PI * 2 / visiblePeers.length - Math.PI / 3;
-    return { ...track, id: peer.id, audioTrackId: track.id, similarity: 0, distanceLabel: "附近", genres: [], sharedArtists: [], suggestions: [], position: { x: 50 + 34 * Math.cos(angle), y: 50 + 34 * Math.sin(angle) } };
+    return { ...track, id: peer.id, audioTrackId: track.id, similarity: 0, distanceLabel: "附近", genres: [], sharedArtists: [], suggestions: [], position: { x: 50 + 40 * Math.cos(angle), y: 50 + 40 * Math.sin(angle) } };
   });
-  return <section className="online-nearby-panel">
-    <div className="radar-heading"><div><h2>附近在听</h2><p className="nearby-subtitle">从一首歌，认识一个人。</p></div><span className="scene-bar__count">{peers.length} 人</span></div>
-    <div className="plugin-discovery"><div><strong>{snapshot ? ready ? "正在匿名分享这首歌" : "正在确认发现状态" : "由你决定什么时候被发现"}</strong><p>{snapshot ? "邀请对方，一起听这首歌。" : "开启后，向附近的人展示当前歌曲。"}</p></div><button type="button" className={snapshot ? "room-secondary" : "room-primary"} disabled={busy || !!snapshot?.ticket || (!snapshot && (!currentTrackId || !online))} onClick={() => void request(snapshot ? "stop" : "start", snapshot ? {} : { trackId: currentTrackId })}>{busy ? "正在更新" : snapshot ? "暂停发现" : "开启发现"}</button></div>
-    {invite && <section className="nearby-invite" aria-label="同频邀请"><p className="section-kicker">{pending ? incoming ? "收到同频邀请" : "邀请已送达" : "邀请状态"}</p><h3>{incoming ? invite.fromAlias : invite.toAlias}</h3><p role="status">{pending ? `一起听《${song?.track}》${incoming ? "，由你带领播放。" : "，等待 TA 接受。"}` : results[invite.status]}</p>{pending && <><small>{seconds > 0 ? `约 ${seconds} 秒后失效` : "邀请已到期，正在确认结果"}</small><div className="nearby-actions">{incoming ? <><button className="room-primary" disabled={busy || !ready || seconds === 0} onClick={() => void request("respond", { inviteId: invite.id, decision: "accept" })}><Headphones size={17} aria-hidden="true" />接受，一起听</button><button className="room-secondary" disabled={busy || !ready || seconds === 0} onClick={() => void request("respond", { inviteId: invite.id, decision: "decline" })}>暂时不了</button></> : <button className="room-secondary" disabled={busy || !ready || seconds === 0} onClick={() => void request("respond", { inviteId: invite.id, decision: "cancel" })}>撤回邀请</button>}</div></>}{pending && <BlockListenerButton key={invite.id} target={{ targetId: incoming ? invite.from : invite.to }} alias={incoming ? invite.fromAlias : invite.toAlias} disabled={busy || !ready || seconds === 0} onBlocked={() => void request("state")} />}{snapshot?.ticket && <button className="room-primary" disabled={!ready} onClick={() => enterSession(snapshot)}>进入同频</button>}</section>}
-    <div className="nearby-orbit"><MusicBackdrop /><div className="nearby-orbit-heading"><h3>同频雷达</h3><button type="button" className="orbit-motion-toggle" aria-label={quiet ? "开启唱片动效" : "关闭唱片动效"} aria-pressed={!quiet} onClick={() => setQuiet(value => !value)}><Sparkles size={15} aria-hidden="true" />{quiet ? "静态" : "动效"}</button></div>
-      <OrbitRadar active={!!snapshot && ready && online} playing={playing} loading={loading} motion={!quiet} onTogglePlayback={player && currentTrack ? () => { if (isCurrent && player.wantsPlayback) player.pause(); else void player.playTrack(currentTrack); } : undefined} track={currentTrack} listeners={radarPeers} selectedId={selected?.id ?? ""} onSelect={listener => { setSelectedId(listener.id); document.getElementById("selected-nearby-person")?.scrollIntoView({ block: "nearest" }); }} />
-      {!peers.length && <p className="orbit-empty-caption" role="status">{snapshot ? "还没有其他听众，先听着。" : "开启发现，听众会出现在轨道上。"}</p>}
+  const title = visible ? ready ? "正在分享给附近" : "正在连接…" : "附近在听";
+  const status = !visible ? online ? "匿名分享你在听的歌" : "网络已断开" : peers.length ? `附近 ${peers.length} 人在听，点封面看看` : "附近暂时没人";
+  return <section className="online-nearby-panel tp-nearby">
+    <div className="tp-stage">
+      <OrbitRadar active={visible && ready && online} playing={playing} loading={loading} motion={!quiet} onTogglePlayback={player && currentTrack ? () => { if (isCurrent && player.wantsPlayback) player.pause(); else void player.playTrack(currentTrack); } : undefined} track={currentTrack} listeners={radarPeers} selectedId={selected?.id ?? ""} onSelect={listener => { setSelectedId(listener.id); document.getElementById("selected-nearby-person")?.scrollIntoView({ block: "nearest" }); }} />
+      <button type="button" className="orbit-motion-toggle tp-icon-btn tp-motion" aria-label={quiet ? "打开唱片动画" : "关闭唱片动画"} title={quiet ? "打开唱片动画" : "关闭唱片动画"} aria-pressed={!quiet} onClick={() => setQuiet(value => !value)}><Sparkles size={18} aria-hidden="true" /></button>
     </div>
-    {peers.length > 0 && <div className="nearby-listeners">{peers.filter(peer => peer.id === selected?.id).map(peer => {
-      const peerTrack = audioTracks.find(track => track.id === peer.trackId)!;
-      return <article id="selected-nearby-person" className="nearby-person" key={peer.id}><AlbumTile coverUrl={peerTrack.coverUrl} accent={peerTrack.accent} size="md" /><div><small>{peer.alias} · 正在听</small><h3>{peerTrack.track}</h3><p>{peerTrack.artist}</p></div><div className="nearby-person-actions"><button className="room-secondary" disabled={busy || !ready || pending || !!error} onClick={() => void request("invite", { targetId: peer.id })}><Send size={16} aria-hidden="true" />邀请同频</button><BlockListenerButton target={{ targetId: peer.id }} alias={peer.alias} disabled={busy || !ready} onBlocked={() => void request("state")} /></div></article>;
-    })}</div>}
-    {peers.length > 1 && <div className="orbit-listener-picker" aria-label="全部听众">{peers.map(peer => <button type="button" key={peer.id} aria-pressed={selected?.id === peer.id} onClick={() => setSelectedId(peer.id)}>{peer.alias} · {audioTracks.find(track => track.id === peer.trackId)?.track}</button>)}</div>}
+    <div className="tp-discovery">
+      <div className="tp-discovery-copy"><h2>{title}</h2><p role="status">{status}</p></div>
+      <button type="button" role="switch" aria-checked={visible} className="tp-switch" disabled={switchDisabled} onClick={onVisibleChange}><span>{busy ? "稍等…" : "附近可见"}</span><span className="tp-switch-track" aria-hidden="true" /></button>
+    </div>
+    {selected && selectedTrack && <article id="selected-nearby-person" className="tp-sheet" key={selected.id}>
+      <div className="tp-sheet-row"><AlbumTile coverUrl={selectedTrack.coverUrl} accent={selectedTrack.accent} size="md" /><div className="tp-sheet-meta"><p className="tp-sheet-who">{selected.alias} 正在听</p><h3>{selectedTrack.track}</h3><p className="tp-sheet-copy">{selectedTrack.artist}</p></div></div>
+      <div className="tp-actions"><button type="button" className="tp-btn tp-btn--primary" disabled={busy || !ready} aria-busy={busy} onClick={() => onFollow(selected)}><Headphones size={18} aria-hidden="true" />{busy ? "正在连上…" : "跟 TA 一起听"}</button>{safety?.(selected)}</div>
+    </article>}
+    {peers.length > 1 && <div className="tp-chips" role="group" aria-label="附近的人">{peers.map(peer => <button type="button" className="tp-chip" key={peer.id} aria-pressed={selected?.id === peer.id} onClick={() => setSelectedId(peer.id)}><b>{peer.alias}</b>{audioTracks.find(track => track.id === peer.trackId)?.track}</button>)}</div>}
     {error && <p className="room-error" role="alert">{error}</p>}
   </section>;
+}
+
+type Props = { nearby: ReturnType<typeof useNearby>; currentTrackId: string | null; player?: ResonancePlayer };
+
+export function OnlineNearbyPanel({ nearby, currentTrackId, player }: Props) {
+  const { snapshot, busy, error, ready, online, request } = nearby;
+  const invitation = snapshot?.ticket?.role === "host" ? snapshot.ticket : null;
+  return <>{invitation && <aside className="tp-invitation" aria-label="一起听邀请"><Headphones size={20} aria-hidden="true" /><div><strong>{invitation.peerAlias} 想和你一起听</strong><p>TA 在房间等你，准备好了再加入</p></div><button type="button" className="tp-btn tp-btn--primary" disabled={busy || !ready || !online} aria-busy={busy} onClick={() => void request("accept", { roomId: invitation.roomId })}>{busy ? "正在加入…" : "加入一起听"}</button></aside>}<NearbyRadar peers={snapshot?.peers ?? []} visible={!!snapshot} ready={ready} online={online} busy={busy} error={error} currentTrackId={currentTrackId} player={player}
+    switchDisabled={busy || !!snapshot?.ticket || (!snapshot && (!currentTrackId || !online))}
+    onVisibleChange={() => void request(snapshot ? "stop" : "start", snapshot ? {} : { trackId: currentTrackId })}
+    onFollow={peer => void request("follow", { targetId: peer.id })}
+    safety={peer => <BlockListenerButton target={{ targetId: peer.id }} alias={peer.alias} disabled={busy || !ready} onBlocked={() => void request("state")} />} /></>;
 }

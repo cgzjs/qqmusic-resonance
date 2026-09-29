@@ -14,7 +14,7 @@ const folder = path.resolve("node_modules/.cache/client-recovery");
 await mkdir(folder, { recursive: true });
 const bundle = path.join(folder, `client-recovery-${process.pid}.mjs`);
 const result = await build({
-  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useIncomingInviteNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
+  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useFollowerNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { RoomSession } from './components/resonance/RoomSession'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
   bundle: true, platform: "node", format: "esm", packages: "external", write: false,
   plugins: [{ name: "test-boundaries", setup(builder) {
     builder.onResolve({ filter: /^(sonner|@\/components\/ui\/sonner)$/ }, args => ({ path: args.path, namespace: "toast" }));
@@ -26,7 +26,7 @@ const result = await build({
   } }],
 });
 await writeFile(bundle, result.outputFiles[0].text);
-const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useIncomingInviteNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, audioTracks } = await import(pathToFileURL(bundle));
+const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useFollowerNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, RoomSession, audioTracks } = await import(pathToFileURL(bundle));
 after(() => unlink(bundle));
 const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const token = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -44,8 +44,8 @@ class Socket {
 }
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 const room = (extra = {}) => ({ id, revision: 1, expiresAt: Date.now() + 100000, closed: false, hostConnected: true, guestConnected: true, playback: { trackId: audioTracks[0].id, position: 2, playing: true, updatedAt: Date.now() }, ...extra });
-const nearby = (extra = {}) => ({ self: { id, alias: "听众 A", trackId: audioTracks[0].id }, peers: [], invite: null, ticket: null, serverTime: Date.now(), ...extra });
-const pendingInvite = () => ({ id: token, from: token, to: id, fromAlias: "听众 B", toAlias: "听众 A", trackId: audioTracks[0].id, status: "pending", expiresAt: Date.now() + 45000 });
+const nearby = (extra = {}) => ({ self: { id, alias: "听众 A", trackId: audioTracks[0].id }, peers: [], ticket: null, serverTime: Date.now(), ...extra });
+const peerB = () => ({ id: token, alias: "听众 B", trackId: audioTracks[1].id });
 const flush = () => act(async () => {});
 beforeEach(() => {
   dom = new JSDOM('<div id="app"></div>', { url: `http://localhost/room/${id}`, pretendToBeVisual: true });
@@ -92,7 +92,7 @@ test("foreground resume pauses synchronously; old queued state cannot release au
   assert.equal(player.status, "paused");
   assert.equal(current.connection, "reconnecting");
   const count = socket.sent.length;
-  await act(async () => { current.command("play"); current.sendReaction("heart"); current.sendExchange("offer", { trackId: audioTracks[0].id }); });
+  await act(async () => { current.command("play"); current.sendReaction("heart"); current.sendExchange(audioTracks[0].id); });
   assert.equal(socket.sent.length, count);
   await act(async () => socket.message({ type: "state", room: room(), serverTime: Date.now() }));
   assert.equal(player.status, "paused");
@@ -103,7 +103,7 @@ test("foreground resume pauses synchronously; old queued state cannot release au
 
 test("offline pauses audio, exchange is not replayed; explicit retry retains its request id", async () => {
   await mount(); const first = await welcome();
-  await act(async () => current.sendExchange("offer", { trackId: audioTracks[0].id }));
+  await act(async () => current.sendExchange(audioTracks[0].id));
   const command = first.sent.at(-1);
   await network(false);
   assert.equal(player.status, "paused"); assert.equal(current.exchangeRequest, "uncertain");
@@ -147,7 +147,7 @@ test("long browser suspension rejects the old socket and resynchronizes paused p
 
 test("expired room clears unresolved exchange and does not resurrect on pageshow", async () => {
   await mount(); await welcome();
-  await act(async () => current.sendExchange("offer", { trackId: audioTracks[0].id }));
+  await act(async () => current.sendExchange(audioTracks[0].id));
   await network(false); respond = async () => response({}, 404);
   await network(true);
   assert.equal(current.connection, "closed"); assert.equal(current.exchangeRequest, "idle");
@@ -156,47 +156,151 @@ test("expired room clears unresolved exchange and does not resurrect on pageshow
   assert.equal(calls.length, count);
 });
 
-test("invitation clock advances offline, disables acceptance and does not auto-start expired presence", async t => {
+test("follow is disabled offline, never sent while offline, and does not auto-start expired presence", async t => {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
-  respond = async () => response({ ...nearby({ invite: pendingInvite() }), token });
+  respond = async () => response({ ...nearby({ peers: [peerB()] }), token });
   await mount("nearby"); await act(async () => current.request("start", { trackId: audioTracks[0].id }));
-  const accept = () => [...document.querySelectorAll("button")].find(button => button.textContent.includes("接受，一起听"));
-  assert.equal(accept().disabled, false);
-  await network(false); assert.equal(accept().disabled, true);
-  await act(async () => t.mock.timers.tick(46000));
-  assert.match(document.body.textContent, /邀请已到期/);
+  const follow = () => [...document.querySelectorAll("button")].find(button => button.textContent.includes("跟 TA 一起听"));
+  assert.equal(follow().disabled, false);
+  await network(false); assert.equal(follow().disabled, true);
+  await act(async () => t.mock.timers.tick(9000));
   const count = calls.length;
-  await act(async () => current.request("respond", { inviteId: token, decision: "accept" }));
+  await act(async () => current.request("follow", { targetId: token }));
   assert.equal(calls.length, count);
   respond = async () => response({ error: "SESSION_EXPIRED" }, 401);
   await network(true);
-  assert.equal(current.snapshot, null); assert.match(current.error, /发现已暂停/);
+  assert.equal(current.snapshot, null); assert.match(current.error, /已自动隐身/);
   assert.equal(calls.filter(item => item.url?.endsWith("start")).length, 1);
 });
 
-test("a queued invitation is discarded after offline; late poll cannot restore readiness", async t => {
+test("tapping follow enters the inviter's room immediately", async () => {
+  respond = async () => response({ ...nearby({ peers: [peerB()] }), token });
+  await mount("nearby"); await act(async () => current.request("start", { trackId: audioTracks[0].id }));
+  assert.equal(document.body.textContent.includes("邀请"), false);
+  const ticket = { roomId: id, token, role: "guest", peerAlias: "听众 B" };
+  respond = async url => response(url.includes("stop") ? {} : nearby({ ticket }));
+  const follow = [...document.querySelectorAll("button")].find(button => button.textContent.includes("跟 TA 一起听"));
+  await act(async () => follow.click()); await flush();
+  const sent = calls.find(item => item.url?.endsWith("/follow"));
+  assert.deepEqual(JSON.parse(sent.options.body), { targetId: token });
+  assert.equal(current.room, id); assert.deepEqual(current.joined, ticket);
+  assert.equal(calls.filter(item => item.url?.endsWith("stop")).length, 1);
+});
+
+test("a host ticket keeps the current page and playback until the invitation is accepted", async () => {
+  const ticket = { roomId: id, token, role: "host", peerAlias: "听众 B" };
+  respond = async () => response({ ...nearby({ ticket }), token });
+  await mount("nearby"); await act(async () => current.request("start", { trackId: audioTracks[0].id }));
+  assert.equal(current.room, null); assert.equal(current.joined, null);
+  assert.equal(sessionStorage.getItem("resonance.nearby-room.account-a.active"), null);
+  assert.equal(calls.some(item => item.pause || item.play || item.route || item.url?.endsWith("stop")), false);
+  const accept = [...document.querySelectorAll("button")].find(button => button.textContent === "加入一起听");
+  assert.ok(accept); assert.match(document.body.textContent, /听众 B 想和你一起听/);
+  respond = async url => response(url.endsWith("stop") ? {} : nearby({ ticket }));
+  await act(async () => accept.click());
+  assert.deepEqual(JSON.parse(calls.find(item => item.url?.endsWith("accept")).options.body), { roomId: id });
+  assert.equal(current.room, id); assert.deepEqual(current.joined, ticket);
+});
+
+test("cancelled invitations disappear on the next poll and a failed accept never enters", async () => {
+  const ticket = { roomId: id, token, role: "host", peerAlias: "听众 B" };
+  respond = async () => response({ ...nearby({ ticket }), token });
+  await mount("nearby"); await act(async () => current.request("start", {}));
+  respond = async () => response({ error: "UNAVAILABLE" }, 409);
+  await act(async () => current.request("accept", { roomId: id }));
+  assert.equal(current.room, null); assert.match(current.error, /已离开/);
+  respond = async () => response(nearby());
+  await act(async () => current.request("state"));
+  assert.equal(document.querySelector(".tp-invitation"), null);
+  assert.equal(current.room, null);
+});
+
+test("a queued follow is discarded after offline; late poll cannot restore readiness", async t => {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
   await mount("nearby"); await act(async () => current.request("start", {}));
   let complete;
   respond = () => new Promise(resolve => { complete = resolve; });
-  let polling, inviting;
-  await act(async () => { polling = current.request("state"); inviting = current.request("invite", { targetId: token }); });
+  let polling, following;
+  await act(async () => { polling = current.request("state"); following = current.request("follow", { targetId: token }); });
   await network(false);
-  await act(async () => { complete(response(nearby())); await polling; t.mock.timers.tick(50); await inviting; });
+  await act(async () => { complete(response(nearby())); await polling; t.mock.timers.tick(50); await following; });
   assert.equal(current.ready, false);
-  assert.equal(calls.some(item => item.url?.endsWith("invite")), false);
+  assert.equal(calls.some(item => item.url?.endsWith("follow")), false);
 });
 
-test("late successful start after pagehide is stopped, never shown or navigated", async () => {
+test("late successful start after pagehide is stopped, never shown or entered", async () => {
   let complete, starting;
   respond = () => new Promise(resolve => { complete = resolve; });
   await mount("nearby");
   await act(async () => { starting = current.request("start", {}); });
   await act(async () => window.dispatchEvent(new window.Event("pagehide")));
   await act(async () => { complete(response({ ...nearby({ ticket: { roomId: id, token } }), token })); await starting; });
-  assert.equal(current.snapshot, null);
+  assert.equal(current.snapshot, null); assert.equal(current.room, null);
   assert.equal(calls.some(item => item.route), false);
   assert.equal(calls.filter(item => item.url?.endsWith("stop")).length, 1);
+});
+
+test("room ticket enters in place: presence stops, no navigation, leaving clears it", async () => {
+  await mount("nearby"); await act(async () => current.request("start", {}));
+  respond = async url => response(url.includes("stop") ? {} : nearby({ ticket: { roomId: id, token } }));
+  await act(async () => current.request("state"));
+  assert.equal(current.room, id); assert.equal(current.snapshot, null);
+  assert.equal(sessionStorage.getItem("resonance.nearby-room.account-a.active"), id);
+  assert.equal(calls.filter(item => item.url?.endsWith("stop")).length, 1);
+  assert.equal(calls.some(item => item.route), false);
+  await act(async () => current.leaveSession());
+  assert.equal(current.room, null);
+  assert.equal(sessionStorage.getItem("resonance.nearby-room.account-a.active"), null);
+});
+
+test("inline room joins on mount without a confirm screen and exits without navigation", async () => {
+  let exited = 0;
+  recoveryTest.host = { session: recoveryTest.session, save: async () => true, dataError: null };
+  Object.assign(player, { currentTime: 2, volume: 1, error: null, stop() { calls.push({ stop: true }); }, changeVolume() {} });
+  await act(async () => root.render(React.createElement(RoomSession, { roomId: id, player, variant: "inline", onExit: () => exited++ })));
+  await flush();
+  assert.equal(sockets.length, 1);
+  assert.equal(document.body.textContent.includes("打开声音，开始听"), false);
+  await welcome();
+  const end = [...document.querySelectorAll("button")].find(button => button.textContent === "结束一起听");
+  await act(async () => end.click());
+  assert.equal(exited, 1);
+  assert.ok(calls.some(item => item.stop));
+  assert.equal(calls.some(item => item.route), false);
+  assert.equal(sockets[0].sent.at(-1).type, "leave");
+});
+
+test("inviter waits with a cancellable loading signal until the host joins", async () => {
+  recoveryTest.host = { session: recoveryTest.session, save: async () => true };
+  await act(async () => root.render(React.createElement(RoomSession, { roomId: id, peerAlias: "听众 B", player, variant: "inline", onExit() {} })));
+  const socket = sockets.at(-1);
+  await act(async () => { socket.open(); socket.message({ type: "welcome", role: "guest", room: room({ hostConnected: false, guestConnected: true, playback: { trackId: audioTracks[0].id, position: 0, playing: false, updatedAt: Date.now() } }), serverTime: Date.now() }); });
+  assert.match(document.querySelector(".tp-room-waiting").textContent, /正在等 听众 B 加入/);
+  assert.equal(document.querySelectorAll(".tp-waiting-signal i").length, 3);
+  assert.ok([...document.querySelectorAll("button")].some(button => button.textContent === "取消等待"));
+  assert.equal(document.querySelector(".tp-room-progress"), null);
+  assert.equal(document.querySelector(".reaction-dock"), null);
+  await act(async () => socket.message({ type: "state", room: room(), serverTime: Date.now() }));
+  assert.equal(document.querySelector(".tp-room-waiting"), null);
+  assert.ok(document.querySelector(".tp-room-progress"));
+  await act(async () => socket.message({ type: "state", room: room({ hostConnected: false }), serverTime: Date.now() }));
+  assert.equal(document.querySelector(".tp-room-waiting"), null, "a later disconnect must not look like an unanswered invitation");
+});
+
+test("followed host carries on from the same spot: seek, then play once the room has it", async () => {
+  recoveryTest.host = { session: recoveryTest.session, save: async () => true, dataError: null };
+  Object.assign(player, { status: "playing", wantsPlayback: true, currentTime: 30, volume: 1, error: null, stop() {}, changeVolume() {} });
+  await act(async () => root.render(React.createElement(RoomSession, { roomId: id, player, variant: "inline", onExit() {} })));
+  await flush();
+  const socket = sockets.at(-1);
+  const fresh = { revision: 2, playback: { trackId: audioTracks[0].id, position: 0, playing: false, updatedAt: Date.now() } };
+  await act(async () => { socket.open(); socket.message({ type: "welcome", role: "host", room: room(fresh), serverTime: Date.now() }); });
+  const commands = () => socket.sent.filter(item => item.type === "command");
+  assert.deepEqual(commands().map(item => [item.action, item.position, item.revision]), [["seek", 30, 2]]);
+  await act(async () => socket.message({ type: "state", room: room({ revision: 3, playback: { ...fresh.playback, position: 30 } }), serverTime: Date.now() }));
+  assert.deepEqual(commands().map(item => item.action), ["seek", "play"]);
+  await act(async () => socket.message({ type: "state", room: room({ revision: 4, playback: { ...fresh.playback, position: 30, playing: true } }), serverTime: Date.now() }));
+  assert.equal(commands().length, 2);
 });
 
 test("pause discovery while offline stays paused after reconnection", async () => {
@@ -219,7 +323,7 @@ test("server-backed reaction survives remount and only notifies the claimed resp
   } };
   function Harness() { current = useDemoReplies(reply => replies.push(reply)); return null; }
   await act(async () => root.render(React.createElement(Harness)));
-  await act(async () => current.sendReaction("wave", audioTracks[0].id));
+  await act(async () => current.sendReaction("heart", audioTracks[0].id));
   await act(async () => current.sendReaction("heart", audioTracks[1].id));
   assert.equal(queued, 1); assert.equal(current.reaction.status, "sent");
   await act(async () => root.render(null));
@@ -237,7 +341,7 @@ test("online reaction never invents a simulated reply after the demo duration", 
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
   await act(async () => root.render(React.createElement(ReactionDock, { mode: "online", outgoing: { id: token, kind: "heart", status: "sent" }, onSend() {} })));
   await act(async () => t.mock.timers.tick(3000));
-  assert.match(document.body.textContent, /等待对方客户端确认/);
+  assert.match(document.body.textContent, /已发出，等 TA 收到/);
   assert.equal(document.querySelector(".demo-response-motion"), null);
   assert.equal(document.body.textContent.includes("TA 也喜欢这首歌"), false);
 });
@@ -252,49 +356,48 @@ test("a late claimed reply does not notify after the account experience unmounts
   assert.equal(replies.length, 0);
 });
 
-test("exchange replies while browsing, saves once and its notification opens the result", async t => {
-  t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+test("demo listeners share the nearby and room screens; a gift is one-way and lands in the journey", async t => {
   t.mock.method(window.HTMLMediaElement.prototype, "load", () => {});
   t.mock.method(window.HTMLMediaElement.prototype, "pause", () => {});
+  t.mock.method(window.HTMLMediaElement.prototype, "play", () => Promise.resolve());
   window.HTMLElement.prototype.scrollTo = () => {};
-  const events = [];
+  const actions = [];
   recoveryTest.toasts = [];
   recoveryTest.host = {
     data: { favoriteIds: [], listenLaterIds: [], events: [], history: [], onlineExchanges: [], demoReplies: [] },
     save: async (action, trackId, id, event) => {
-      if (action === "event") events.push(event);
-      if (action === "queueExchange") recoveryTest.host.data.demoReplies = [{ id, trackId, kind: "exchange", event, dueAt: Date.now() + 2600, status: "pending", notified: false }];
+      actions.push(action);
+      if (action === "event") recoveryTest.host.data = { ...recoveryTest.host.data, events: [...recoveryTest.host.data.events, event] };
       return true;
     },
-    claimReply: async id => { const item = recoveryTest.host.data.demoReplies.find(item => item.id === id); if (item.notified) return null; item.notified = true; return { ...item }; },
+    claimReply: async () => null,
   };
-  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineNotice: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
+  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
   const click = async label => {
     const button = [...document.querySelectorAll("button")].find(item => item.textContent.trim() === label || item.getAttribute("aria-label") === label);
     assert.ok(button, `Missing button: ${label}`);
     await act(async () => button.click());
   };
-  await click(`查看 ${audioTracks[0].track}`);
-  await click("丢一首歌给 TA");
-  await click("匿名送出这首歌");
-  await click("先去逛逛");
-  await click("足迹与收藏");
-  await act(async () => t.mock.timers.tick(2599));
+  assert.ok(document.querySelector(".tp-nearby"), "demo listeners use the same nearby radar as real ones");
+  await click("跟 TA 一起听");
+  assert.ok(document.querySelector(".tp-room-session"), "following a demo listener opens the shared room screen");
+  assert.equal(document.querySelector(".bottom-nav"), null);
+  await click("挑一首");
+  const send = [...document.querySelectorAll("button")].find(item => item.textContent.startsWith("送出《"));
+  assert.ok(send);
+  await act(async () => send.click());
+  const gifts = recoveryTest.host.data.events.filter(event => event.type === "exchange");
+  assert.equal(gifts.length, 1);
+  assert.equal(gifts[0].receivedTrackId, undefined);
+  assert.ok(!actions.includes("queueExchange"), "no reply song is queued");
+  assert.match(document.body.textContent, /已送给 TA/);
   assert.equal(recoveryTest.toasts.length, 0);
-  assert.match(document.body.textContent, /我的音乐足迹/);
-  await act(async () => t.mock.timers.tick(1));
-  const pendingReply = recoveryTest.host.data.demoReplies[0];
-  events.push(pendingReply.event);
-  recoveryTest.host.data.demoReplies = [{ ...pendingReply, status: "ready" }];
-  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineNotice: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
-  assert.equal(events.filter(event => event.type === "exchange").length, 1);
-  assert.equal(recoveryTest.toasts.length, 1);
-  assert.equal(recoveryTest.toasts[0].title, "TA 回了你一首歌");
-  assert.match(document.body.textContent, /我的音乐足迹/);
-  await act(async () => recoveryTest.toasts[0].action.onClick());
-  assert.match(document.body.textContent, /收到一首新音乐/);
-  await act(async () => t.mock.timers.tick(3000));
-  assert.equal(events.filter(event => event.type === "exchange").length, 1);
+  await click("结束一起听");
+  assert.ok(document.querySelector(".tp-nearby"));
+  await click("足迹与收藏");
+  assert.match(document.body.textContent, /一起听时送给 TA/);
+  const total = [...document.querySelectorAll(".stat-grid article")].find(item => item.textContent.includes("今日送歌"));
+  assert.equal(total.querySelector("strong").textContent, "1");
 });
 
 test("received list does not mark on mount; opening unavailable songs supports read failure and retry", async () => {
@@ -322,37 +425,56 @@ test("journey exchange total matches its deduplicated mixed-source history", asy
     onlineExchanges: [online, online, { ...online, roomId: "second" }],
     onPlayTrack() {}, onRemoveFavorite() {}, onRemoveLater() {},
   })));
-  const total = [...document.querySelectorAll('.stat-grid article')].find(item => item.textContent.includes('今日交换'));
+  const total = [...document.querySelectorAll('.stat-grid article')].find(item => item.textContent.includes('今日送歌'));
   assert.equal(total.querySelector('strong').textContent, '3');
   assert.equal(document.querySelectorAll('.journey-event').length, 3);
 });
 
-test("incoming invitation notifies once, opens invitation and disappears when resolved", async () => {
-  let opened = 0;
-  function Harness({ invite }) { useIncomingInviteNotification(invite, () => opened++); return null; }
-  const invite = pendingInvite();
-  await act(async () => root.render(React.createElement(Harness, { invite })));
-  await act(async () => root.render(React.createElement(Harness, { invite: { ...invite } })));
-  assert.equal(recoveryTest.toasts.length, 1);
-  assert.equal(recoveryTest.toasts[0].title, "有人邀请你一起听");
-  recoveryTest.toasts[0].action.onClick(); assert.equal(opened, 1);
-  await act(async () => root.render(React.createElement(Harness, { invite: null })));
-  assert.ok(recoveryTest.dismissedToasts.includes(recoveryTest.toasts[0].id));
+test("journey has two tabs: gifts sit above the timeline, favorites and later share one tab", async () => {
+  const received = [0, 1, 2, 3].map(index => ({ id: `online:room:${index}`, receivedTrackId: audioTracks[index % audioTracks.length].id, receivedAt: Date.now() - index, unread: index === 0 }));
+  await act(async () => root.render(React.createElement(JourneySummary, {
+    library: { version: 1, favoriteIds: [audioTracks[0].id], listenLaterIds: [], events: [] },
+    received, onPlayTrack() {}, onRemoveFavorite() {}, onRemoveLater() {},
+  })));
+  const segments = [...document.querySelectorAll('.tp-segments button')];
+  assert.deepEqual(segments.map(item => item.getAttribute('aria-label')), ['足迹，1 首送你的歌未读', '收藏与待听 1']);
+  assert.equal(document.querySelectorAll('.tp-letter').length, 3);
+  assert.match(document.body.textContent, /TA 送你的/);
+  await act(async () => segments[1].click());
+  assert.equal(document.querySelectorAll('.tp-wall li').length, 1);
+  assert.match(document.body.textContent, /待听/); assert.match(document.body.textContent, /稍后再听/);
 });
 
-test("room recipient gets offer toast; sender does not; completion notifies without heartbeat duplicates", async () => {
-  const offered = { id: token, from: "host", status: "pending", offeredTrackId: audioTracks[0].id, createdAt: Date.now(), expiresAt: Date.now() + 60000, saved: {host:false,guest:false} };
-  function Harness({ state, role }) { useRoomExchangeNotification(state, role, true); return null; }
-  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: offered }), role: "host" })));
-  assert.equal(recoveryTest.toasts.length, 0);
-  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: offered }), role: "guest" })));
-  assert.equal(recoveryTest.toasts.length, 1); assert.equal(recoveryTest.toasts[0].title, "TA 送来一首歌");
-  await act(async () => root.render(React.createElement(Harness, { state: room({ revision: 2, exchange: { ...offered } }), role: "guest" })));
+test("host notification waits for an explicit click, keeps the latest handler and dismisses stale invitations", async () => {
+  let accepted = 0;
+  function Harness({ ticket, onAccept = () => accepted++ }) { useFollowerNotification(ticket, onAccept); return null; }
+  const ticket = { roomId: id, token, role: "host", peerAlias: "听众 B" };
+  await act(async () => root.render(React.createElement(Harness, { ticket })));
+  await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket } })));
   assert.equal(recoveryTest.toasts.length, 1);
-  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: { ...offered, status: "completed", responseTrackId: audioTracks[1].id } }), role: "guest" })));
-  assert.equal(recoveryTest.toasts.length, 2);
-  assert.equal(recoveryTest.toasts[1].description, `《${audioTracks[0].track}》`);
-  assert.ok(recoveryTest.dismissedToasts.includes(recoveryTest.toasts[0].id));
+  assert.equal(accepted, 0);
+  assert.equal(recoveryTest.toasts[0].title, "听众 B 想和你一起听");
+  assert.equal(recoveryTest.toasts[0].action.label, "加入一起听");
+  await act(async () => root.render(React.createElement(Harness, { ticket, onAccept: () => accepted += 2 })));
+  await act(async () => recoveryTest.toasts[0].action.onClick());
+  assert.equal(accepted, 2);
+  await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket, roomId: token, role: "guest" } })));
+  assert.equal(recoveryTest.toasts.length, 1);
+  assert.ok(recoveryTest.dismissedToasts.includes(`nearby-follower-${id}`));
+});
+
+test("room gift toasts only the recipient, once per gift", async () => {
+  const gift = { id: token, from: "host", status: "completed", offeredTrackId: audioTracks[0].id, createdAt: Date.now(), completedAt: Date.now(), saved: {host:false,guest:false} };
+  function Harness({ state, role }) { useRoomExchangeNotification(state, role, true); return null; }
+  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: gift }), role: "host" })));
+  assert.equal(recoveryTest.toasts.length, 0);
+  await act(async () => root.render(React.createElement(Harness, { state: room({ exchange: gift }), role: "guest" })));
+  assert.equal(recoveryTest.toasts.length, 1); assert.equal(recoveryTest.toasts[0].title, "TA 送你一首歌");
+  assert.equal(recoveryTest.toasts[0].description, `《${audioTracks[0].track}》`);
+  await act(async () => root.render(React.createElement(Harness, { state: room({ revision: 2, exchange: { ...gift, saved: {host:true,guest:true} } }), role: "guest" })));
+  assert.equal(recoveryTest.toasts.length, 1);
+  await act(async () => root.render(React.createElement(Harness, { state: room({ revision: 3, exchange: { ...gift, id: crypto.randomUUID(), offeredTrackId: audioTracks[1].id } }), role: "guest" })));
+  assert.equal(recoveryTest.toasts.length, 2); assert.equal(recoveryTest.toasts[1].description, `《${audioTracks[1].track}》`);
 });
 
 test("current playback bar keeps paused song changes paused, wraps tracks and plays playlist choices", async () => {
@@ -398,7 +520,7 @@ test("blocking requires confirmation, leaves failed requests retryable, and repo
   const confirm = () => [...document.querySelectorAll('button')].find(button => button.textContent === '确认屏蔽');
   await act(async () => confirm().click());
   assert.equal(completed, 0);
-  assert.match(document.querySelector('[role="alert"]').textContent, /结果尚未确认/);
+  assert.match(document.querySelector('[role="alert"]').textContent, /结果未确认/);
   respond = async () => response({ blocks: [{ id: token, alias: '听众 B', createdAt: Date.now() }] });
   await act(async () => confirm().click());
   assert.equal(completed, 1);
@@ -426,7 +548,7 @@ test("record effects follow actual playback, respect quiet mode and visibility, 
   const track = audioTracks[0];
   let paused = 0, played = 0;
   const playback = { ...player, track, status: 'loading', wantsPlayback: true, pause: () => paused++, playTrack: async () => { played++; return true; } };
-  const connection = { snapshot: nearby(), busy: false, error: null, ready: true, online: true, now: Date.now(), request: async () => {}, enterSession() {} };
+  const connection = { snapshot: nearby(), busy: false, error: null, ready: true, online: true, now: Date.now(), room: null, request: async () => {}, leaveSession() {} };
   const render = () => act(async () => root.render(React.createElement(OnlineNearbyPanel, { nearby: connection, currentTrackId: track.id, player: playback })));
   await render();
   const map = () => document.querySelector('.orbit-map');
@@ -459,16 +581,16 @@ test("avatar gestures identify the sender, never turn delivery acknowledgement i
   let outgoing = null, incoming = null;
   const render = () => act(async () => root.render(React.createElement(ListeningArtwork, { track, mode: 'online', role: 'guest', outgoing, incoming })));
   await render();
-  outgoing = { id: 'hello-self', kind: 'wave', trackId: track.id, status: 'sending' }; await render();
-  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'wave');
+  outgoing = { id: 'hello-self', kind: 'heart', trackId: track.id, status: 'sending' }; await render();
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'heart');
   const face = document.querySelector('[data-person="self"] .listener-avatar-face');
   outgoing = { ...outgoing, status: 'received' }; await render();
   assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face'), face, 'acknowledgement does not restart the sender animation');
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
-  incoming = { id: 'hello-other-song', from: 'host', kind: 'wave', trackId: audioTracks[1].id, createdAt: Date.now() }; await render();
+  incoming = { id: 'hello-other-song', from: 'host', kind: 'heart', trackId: audioTracks[1].id, createdAt: Date.now() }; await render();
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
   incoming = { ...incoming, id: 'hello-peer', trackId: track.id }; await render();
-  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'wave');
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'heart');
   incoming = { ...incoming, id: 'wrong-sender', from: 'guest' }; await render();
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
   outgoing = { ...outgoing, status: 'failed' }; await render();
@@ -477,15 +599,15 @@ test("avatar gestures identify the sender, never turn delivery acknowledgement i
 
 test("demo avatars wait for the saved reply; historical reactions do not replay when entering the view", async () => {
   const track = audioTracks[0];
-  let outgoing = { id: 'old', kind: 'wave', trackId: track.id, status: 'received' };
+  let outgoing = { id: 'old', kind: 'heart', trackId: track.id, status: 'received' };
   const render = () => act(async () => root.render(React.createElement(ListeningArtwork, { track, mode: 'demo', outgoing })));
   await render();
   assert.equal(document.querySelectorAll('[data-gesture]').length, 0);
   outgoing = { ...outgoing, id: 'new', status: 'sent' }; await render();
-  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'wave');
+  assert.equal(document.querySelector('[data-person="self"] .listener-avatar-face').dataset.gesture, 'heart');
   assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, undefined);
   outgoing = { ...outgoing, status: 'received' }; await render();
-  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'wave');
+  assert.equal(document.querySelector('[data-person="peer"] .listener-avatar-face').dataset.gesture, 'heart');
   await act(async () => new Promise(resolve => setTimeout(resolve, 2700)));
   assert.equal(document.querySelectorAll('[data-gesture]').length, 0, 'completed gestures cannot replay when quiet mode is changed');
 });

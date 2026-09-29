@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { mockAccount, accountHeaders } from "./host-test-helpers.mjs";
-import { setupExchangeRoom, ExchangePeer, accountData } from "./exchange-test-helpers.mjs";
+import { setupExchangeRoom, ExchangePeer, accountData, waitForRecords } from "./exchange-test-helpers.mjs";
 
 const base = process.env.ROOM_TEST_URL ?? "http://localhost:5173";
 const { tracks } = JSON.parse(await readFile(new URL("../lib/resonance/catalog.generated.json", import.meta.url), "utf8"));
@@ -27,8 +27,8 @@ test("account blocks survive new presence and login, hide both ways, remain priv
     assert.deepEqual((await call("block", a, { targetId: bp.self.id })).blocks, blocked.blocks);
     assert.ok(!(await state(a, ap)).peers.some(p => p.id === bp.self.id));
     assert.ok(!(await state(b, bp)).peers.some(p => p.id === ap.self.id));
-    await call("invite", b, { targetId: ap.self.id }, bp.token, 409);
-    await call("invite", a, { targetId: bp.self.id }, ap.token, 409);
+    await call("follow", b, { targetId: ap.self.id }, bp.token, 409);
+    await call("follow", a, { targetId: bp.self.id }, ap.token, 409);
     await call("unblock", c, { id: blocked.blocks[0].id });
     assert.deepEqual((await call("blocks", a)).blocks, blocked.blocks);
     assert.deepEqual(await accountData(base, a), before, "blocking leaves music records intact");
@@ -44,24 +44,22 @@ test("account blocks survive new presence and login, hide both ways, remain priv
   } finally { await stop(a, ap); await stop(b, bp); }
 });
 
-test("blocking cancels a pending invitation and one-sided unblock does not override the other person's block", async () => {
+test("a block on either side stops follows, and one-sided unblock does not override the other person's block", async () => {
   const a = await mockAccount(base), b = await mockAccount(base);
   const ap = await start(a), bp = await start(b);
   try {
-    const invited = await call("invite", a, { targetId: bp.self.id }, ap.token);
     const blockB = await call("block", b, { targetId: ap.self.id });
-    assert.equal((await state(a, ap)).invite.status, "cancelled");
-    await call("respond", b, { inviteId: invited.invite.id, decision: "accept" }, bp.token, 409);
+    assert.equal((await call("follow", a, { targetId: bp.self.id }, ap.token, 409)).error, "UNAVAILABLE");
     const blockA = await call("block", a, { targetId: bp.self.id });
     await call("unblock", b, { id: blockB.blocks[0].id });
     assert.ok(!(await state(a, ap)).peers.some(p => p.id === bp.self.id));
     await call("unblock", a, { id: blockA.blocks[0].id });
     assert.ok((await state(a, ap)).peers.some(p => p.id === bp.self.id));
-    assert.equal((await state(a, ap)).invite.status, "cancelled", "unblock never revives old invitations");
+    assert.equal((await state(a, ap)).ticket, null, "unblocking never creates a room");
   } finally { await stop(a, ap); await stop(b, bp); }
 });
 
-test("room blocking stops both clients and pending exchanges; unrelated accounts cannot block a room", async () => {
+test("room blocking stops both clients and keeps songs already sent; unrelated accounts cannot block a room", async () => {
   const setup = await setupExchangeRoom(base, tracks.slice(0, 2).map(t => t.id));
   const stranger = await mockAccount(base);
   const host = new ExchangePeer(base, setup.hostTicket, setup.hostAccount);
@@ -79,26 +77,25 @@ test("room blocking stops both clients and pending exchanges; unrelated accounts
     for (const client of [host, guest]) {
       const closed = await client.wait(e => e.room?.closed);
       assert.equal(closed.room.playback.playing, false);
-      assert.equal(closed.room.exchange.status, "ended");
+      assert.equal(closed.room.exchange.status, "completed");
     }
     assert.deepEqual((await call("block", setup.guestAccount, { roomId: setup.guestTicket.roomId })).blocks, blocked.blocks);
     await call("unblock", setup.guestAccount, { id: blocked.blocks[0].id });
     assert.equal((await fetch(`${base}/api/rooms/${setup.hostTicket.roomId}/status`)).status, 404);
-    assert.equal((await accountData(base, setup.hostAccount)).onlineExchanges.length, 0);
+    assert.equal((await waitForRecords(base, setup.hostAccount)).onlineExchanges[0].sentTrackId, tracks[0].id);
   } finally { host.close(); guest.close(); }
 });
 
-test("racing accept and block cannot leave a usable room or an accepted ticket", async () => {
+test("racing follow and block cannot leave a usable room or a ticket", async () => {
   const a = await mockAccount(base), b = await mockAccount(base);
   const ap = await start(a), bp = await start(b);
   try {
-    const invited = await call("invite", a, { targetId: bp.self.id }, ap.token);
-    const [accepted, block] = await Promise.all([
-      fetch(`${base}/api/nearby/respond`, { method: "POST", headers: { ...accountHeaders(b.session), Authorization: `Bearer ${bp.token}`, "Content-Type": "application/json" }, body: JSON.stringify({ inviteId: invited.invite.id, decision: "accept" }) }),
-      call("block", a, { targetId: bp.self.id }),
+    const [followed, block] = await Promise.all([
+      fetch(`${base}/api/nearby/follow`, { method: "POST", headers: { ...accountHeaders(a.session), Authorization: `Bearer ${ap.token}`, "Content-Type": "application/json" }, body: JSON.stringify({ targetId: bp.self.id }) }),
+      call("block", b, { targetId: ap.self.id }),
     ]);
-    assert.ok([200, 409].includes(accepted.status));
-    const result = await accepted.json();
+    assert.ok([200, 409].includes(followed.status));
+    const result = await followed.json();
     if (result.ticket) assert.equal((await fetch(`${base}/api/rooms/${result.ticket.roomId}/status`)).status, 404);
     assert.equal((await state(a, ap)).ticket, null);
     assert.equal((await state(b, bp)).ticket, null);
