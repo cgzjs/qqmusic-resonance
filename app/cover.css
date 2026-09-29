@@ -361,10 +361,11 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-room .interaction-glyph[data-kind="heart"] { -webkit-mask-image: url('/assets/interaction/heart.svg'); mask-image: url('/assets/interaction/heart.svg'); }
 .tp-room .interaction-glyph[data-kind="exchange"] { -webkit-mask-image: url('/assets/interaction/exchange.svg'); mask-image: url('/assets/interaction/exchange.svg'); }
 
-.tp-join { display: grid; justify-items: center; gap: 16px; padding: 56px 8px 24px; text-align: center; animation: tp-rise .35s var(--tp-ease); }
-.tp-join > svg { color: var(--cover-accent); }
-.tp-join p { margin: 0; color: var(--cover-ink-2); font-size: 14px; line-height: 1.8; }
-.tp-join .tp-btn { flex: none; width: 100%; max-width: 320px; }
+/* 一起听本体：页面版撑满外壳，原地版跟随附近页滚动，从雷达位置升起。 */
+.tp-room-session { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.tp-room-session[data-variant="inline"] { display: block; animation: tp-rise .35s var(--tp-ease); }
+.tp-room-head { display: flex; align-items: center; min-height: 48px; padding-right: 16px; }
+.tp-room-session[data-variant="inline"] .tp-room-body { overflow: visible; padding-bottom: 24px; }
 
 /* 主视觉：你 —— 唱片 —— TA，一条细线穿过唱片中心；播放时唱片转、线上有光点走过 */
 .tp-now { display: grid; justify-items: center; padding-top: 8px; text-align: center; }

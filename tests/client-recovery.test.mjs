@@ -14,7 +14,7 @@ const folder = path.resolve("node_modules/.cache/client-recovery");
 await mkdir(folder, { recursive: true });
 const bundle = path.join(folder, `client-recovery-${process.pid}.mjs`);
 const result = await build({
-  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useIncomingInviteNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
+  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useIncomingInviteNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { RoomSession } from './components/resonance/RoomSession'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
   bundle: true, platform: "node", format: "esm", packages: "external", write: false,
   plugins: [{ name: "test-boundaries", setup(builder) {
     builder.onResolve({ filter: /^(sonner|@\/components\/ui\/sonner)$/ }, args => ({ path: args.path, namespace: "toast" }));
@@ -26,7 +26,7 @@ const result = await build({
   } }],
 });
 await writeFile(bundle, result.outputFiles[0].text);
-const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useIncomingInviteNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, audioTracks } = await import(pathToFileURL(bundle));
+const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useIncomingInviteNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, RoomSession, audioTracks } = await import(pathToFileURL(bundle));
 after(() => unlink(bundle));
 const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const token = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -187,16 +187,46 @@ test("a queued invitation is discarded after offline; late poll cannot restore r
   assert.equal(calls.some(item => item.url?.endsWith("invite")), false);
 });
 
-test("late successful start after pagehide is stopped, never shown or navigated", async () => {
+test("late successful start after pagehide is stopped, never shown or entered", async () => {
   let complete, starting;
   respond = () => new Promise(resolve => { complete = resolve; });
   await mount("nearby");
   await act(async () => { starting = current.request("start", {}); });
   await act(async () => window.dispatchEvent(new window.Event("pagehide")));
   await act(async () => { complete(response({ ...nearby({ ticket: { roomId: id, token } }), token })); await starting; });
-  assert.equal(current.snapshot, null);
+  assert.equal(current.snapshot, null); assert.equal(current.room, null);
   assert.equal(calls.some(item => item.route), false);
   assert.equal(calls.filter(item => item.url?.endsWith("stop")).length, 1);
+});
+
+test("room ticket enters in place: presence stops, no navigation, leaving clears it", async () => {
+  await mount("nearby"); await act(async () => current.request("start", {}));
+  respond = async url => response(url.includes("stop") ? {} : nearby({ ticket: { roomId: id, token } }));
+  await act(async () => current.request("state"));
+  assert.equal(current.room, id); assert.equal(current.snapshot, null);
+  assert.equal(sessionStorage.getItem("resonance.nearby-room.account-a.active"), id);
+  assert.equal(calls.filter(item => item.url?.endsWith("stop")).length, 1);
+  assert.equal(calls.some(item => item.route), false);
+  await act(async () => current.leaveSession());
+  assert.equal(current.room, null);
+  assert.equal(sessionStorage.getItem("resonance.nearby-room.account-a.active"), null);
+});
+
+test("inline room joins on mount without a confirm screen and exits without navigation", async () => {
+  let exited = 0;
+  recoveryTest.host = { session: recoveryTest.session, save: async () => true, dataError: null };
+  Object.assign(player, { currentTime: 2, volume: 1, error: null, stop() { calls.push({ stop: true }); }, changeVolume() {} });
+  await act(async () => root.render(React.createElement(RoomSession, { roomId: id, player, variant: "inline", onExit: () => exited++ })));
+  await flush();
+  assert.equal(sockets.length, 1);
+  assert.equal(document.body.textContent.includes("打开声音，开始听"), false);
+  await welcome();
+  const end = [...document.querySelectorAll("button")].find(button => button.textContent === "结束一起听");
+  await act(async () => end.click());
+  assert.equal(exited, 1);
+  assert.ok(calls.some(item => item.stop));
+  assert.equal(calls.some(item => item.route), false);
+  assert.equal(sockets[0].sent.at(-1).type, "leave");
 });
 
 test("pause discovery while offline stays paused after reconnection", async () => {
@@ -426,7 +456,7 @@ test("record effects follow actual playback, respect quiet mode and visibility, 
   const track = audioTracks[0];
   let paused = 0, played = 0;
   const playback = { ...player, track, status: 'loading', wantsPlayback: true, pause: () => paused++, playTrack: async () => { played++; return true; } };
-  const connection = { snapshot: nearby(), busy: false, error: null, ready: true, online: true, now: Date.now(), request: async () => {}, enterSession() {} };
+  const connection = { snapshot: nearby(), busy: false, error: null, ready: true, online: true, now: Date.now(), room: null, request: async () => {}, leaveSession() {} };
   const render = () => act(async () => root.render(React.createElement(OnlineNearbyPanel, { nearby: connection, currentTrackId: track.id, player: playback })));
   await render();
   const map = () => document.querySelector('.orbit-map');

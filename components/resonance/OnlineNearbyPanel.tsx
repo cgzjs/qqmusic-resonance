@@ -14,7 +14,7 @@ type Props = { nearby: ReturnType<typeof useNearby>; currentTrackId: string | nu
 const results = { accepted: "已接受，马上开始", declined: "这次没约上", cancelled: "邀请已取消。", expired: "邀请已到期", pending: "等待回应" };
 
 export function OnlineNearbyPanel({ nearby, currentTrackId, player }: Props) {
-  const { snapshot, busy, error, ready, online, now, request, enterSession } = nearby;
+  const { snapshot, busy, error, ready, online, now, request } = nearby;
   const [selectedId, setSelectedId] = useState("");
   const [quiet, setQuiet] = useState(false);
   const invite = snapshot?.invite;
@@ -56,7 +56,6 @@ export function OnlineNearbyPanel({ nearby, currentTrackId, player }: Props) {
         <div className="tp-actions">{incoming ? <><button type="button" className="tp-btn tp-btn--primary" disabled={busy || !ready || seconds === 0} onClick={() => void request("respond", { inviteId: invite.id, decision: "accept" })}><Headphones size={18} aria-hidden="true" />接受，一起听</button><button type="button" className="tp-btn tp-btn--quiet" disabled={busy || !ready || seconds === 0} onClick={() => void request("respond", { inviteId: invite.id, decision: "decline" })}>暂时不了</button></> : <button type="button" className="tp-btn tp-btn--quiet" disabled={busy || !ready || seconds === 0} onClick={() => void request("respond", { inviteId: invite.id, decision: "cancel" })}>撤回邀请</button>}</div>
         <BlockListenerButton key={invite.id} target={{ targetId: incoming ? invite.from : invite.to }} alias={incoming ? invite.fromAlias : invite.toAlias} disabled={busy || !ready || seconds === 0} onBlocked={() => void request("state")} />
       </>}
-      {snapshot?.ticket && <div className="tp-actions"><button type="button" className="tp-btn tp-btn--primary" disabled={!ready} onClick={() => enterSession(snapshot)}>开始一起听</button></div>}
     </section>}
     {selected && selectedTrack && <article id="selected-nearby-person" className="tp-sheet" key={selected.id}>
       <div className="tp-sheet-row"><AlbumTile coverUrl={selectedTrack.coverUrl} accent={selectedTrack.accent} size="md" /><div className="tp-sheet-meta"><p className="tp-sheet-who">{selected.alias} 正在听</p><h3>{selectedTrack.track}</h3><p className="tp-sheet-copy">{selectedTrack.artist}</p></div></div>

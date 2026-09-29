@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import type { NearbySnapshot } from "@/lib/resonance/nearby-protocol";
 import { accountHeaders, type HostSession } from "@/lib/resonance/host-protocol";
 import { demoHost } from "@/lib/resonance/demo-host";
@@ -21,8 +20,16 @@ const subscribeNetwork = (notify: () => void) => {
 const readOnline = () => navigator.onLine;
 const serverOnline = () => true;
 
+const readActiveRoom = (accountId: string) => {
+  try {
+    const roomId = sessionStorage.getItem(`resonance.nearby-room.${accountId}.active`);
+    return roomId && sessionStorage.getItem(`resonance.nearby-room.${accountId}.${roomId}`) ? roomId : null;
+  } catch { return null; }
+};
+
 export function useNearby(session: HostSession) {
-  const router = useRouter();
+  // 一起听在附近页原地进行；刷新后从会话存储恢复同一个房间。
+  const [room, setRoom] = useState<string | null>(() => readActiveRoom(session.accountId));
   const [snapshot, setSnapshot] = useState<NearbySnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,16 +44,33 @@ export function useNearby(session: HostSession) {
   const tokenRef = useRef<string | null>(null);
   const pendingRef = useRef(false);
   const mountedRef = useRef(true);
-  const enteringRef = useRef(false);
+  const enteringRef = useRef(room !== null);
 
+  // 拿到房间凭据即进入：同时退出附近可见，避免一边一起听一边被别人找到。
   const enterSession = useCallback((next: NearbySnapshot) => {
-    if (!next.ticket || enteringRef.current) return;
+    if (!next.ticket || enteringRef.current) return false;
+    const prefix = `resonance.nearby-room.${session.accountId}.`;
     try {
-      sessionStorage.setItem(`resonance.nearby-room.${session.accountId}.${next.ticket.roomId}`, next.ticket.token);
-      enteringRef.current = true;
-      router.push(`/room/${next.ticket.roomId}`);
-    } catch { setError("请允许浏览器保存网站数据"); }
-  }, [router, session.accountId]);
+      sessionStorage.setItem(prefix + next.ticket.roomId, next.ticket.token);
+      sessionStorage.setItem(`${prefix}active`, next.ticket.roomId);
+    } catch { setError("请允许浏览器保存网站数据"); return false; }
+    enteringRef.current = true;
+    const token = tokenRef.current;
+    epoch.current++; tokenRef.current = null; readyRef.current = false;
+    if (token) void fetch("/api/nearby/stop", { method: "POST", headers: { "Content-Type": "application/json", ...accountHeaders(session), Authorization: `Bearer ${token}` }, body: "{}", keepalive: true }).catch(() => {});
+    setSnapshot(null); setReady(false); setError(null); setRoom(next.ticket.roomId);
+    return true;
+  }, [session]);
+
+  const leaveSession = useCallback(() => {
+    const prefix = `resonance.nearby-room.${session.accountId}.`;
+    try {
+      const active = sessionStorage.getItem(`${prefix}active`);
+      if (active) sessionStorage.removeItem(prefix + active);
+      sessionStorage.removeItem(`${prefix}active`);
+    } catch { /* 内存状态照样退出。 */ }
+    enteringRef.current = false; setRoom(null);
+  }, [session.accountId]);
 
   const request = useCallback(async function perform(action: string, body?: object) {
     if (action === "stop") {
@@ -95,7 +119,7 @@ export function useNearby(session: HostSession) {
       readyRef.current = true; setReady(true); setNow(Date.now() + serverOffset.current);
       setError(null);
       if (result.token) tokenRef.current = result.token;
-      setSnapshot(result); enterSession(result);
+      if (!enterSession(result)) setSnapshot(result);
     } catch (reason) {
       if (mountedRef.current && startedEpoch === epoch.current) {
         readyRef.current = false; setReady(false);
@@ -144,5 +168,5 @@ export function useNearby(session: HostSession) {
       document.removeEventListener("visibilitychange", restore);
     };
   }, [request, session]);
-  return { snapshot, busy, error, ready, online, now, request, enterSession };
+  return { snapshot, busy, error, ready, online, now, room, request, leaveSession };
 }

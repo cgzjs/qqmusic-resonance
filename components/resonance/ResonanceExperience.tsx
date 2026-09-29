@@ -41,7 +41,7 @@ function restoreExchange(item?: DemoReply): ExchangeDraft | null {
   return { id: item!.id, listener, source: "match", scene: event.scene, selectedId: event.trackId, receivedId: event.receivedTrackId ?? null, status: item!.status === "pending" ? "sending" : "received", queuedEvent: event };
 }
 
-type ExperienceProps = { playbackHeader?: (player: ResonancePlayer) => ReactNode; onTrackChange?: (trackId: string) => void; onlinePanel: ReactNode | ((player: ResonancePlayer) => ReactNode); onlineNotice: string | null; incomingInvite?: NearbyInvite | null; onlineActive: boolean; onPauseOnline: () => void; initialSource: "demo" | "online" };
+type ExperienceProps = { roomView?: ((player: ResonancePlayer) => ReactNode) | null; playbackHeader?: (player: ResonancePlayer) => ReactNode; onTrackChange?: (trackId: string) => void; onlinePanel: ReactNode | ((player: ResonancePlayer) => ReactNode); onlineNotice: string | null; incomingInvite?: NearbyInvite | null; onlineActive: boolean; onPauseOnline: () => void; initialSource: "demo" | "online" };
 export function ResonanceExperience(props: ExperienceProps) {
   return playableListeners.length ? <PopulatedExperience {...props} /> : <EmptyPlaylistExperience />;
 }
@@ -55,7 +55,7 @@ function EmptyPlaylistExperience() {
   });
   return <section className="empty-playlist"><h2>歌单还没有歌曲</h2><p>添加歌曲后即可开始，收藏和足迹仍在</p><JourneySummary initialTab={unreadCount ? "received" : "history"} received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><MockHostPanel /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
 }
-function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlineNotice, incomingInvite, onlineActive, onPauseOnline, initialSource }: ExperienceProps) {
+function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePanel, onlineNotice, incomingInvite, onlineActive, onPauseOnline, initialSource }: ExperienceProps) {
   const { library, dispatch, onlineHistory, onlineExchanges, received, markExchangeRead, unreadCount, queueExchange, demoReplies } = useAccountLibrary();
   const [view, setView] = useState<AppView>("radar");
   const [journeyTab, setJourneyTab] = useState<JourneyTab>("history");
@@ -179,9 +179,11 @@ function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlin
     setScene(next); setScanRound(0); setIsScanning(false); setSelectedId(sceneListenerIds[next][0]);
   }
 
-  useEffect(() => { contentRef.current?.scrollTo({ top: 0 }); }, [view, radarSource]);
+  const inRoom = !!roomView;
+  useEffect(() => { contentRef.current?.scrollTo({ top: 0 }); }, [view, radarSource, inRoom]);
+  // 一起听由房间自己记足迹，这里不再按模拟听众记一次。
   useEffect(() => {
-    if (player.status !== "playing" || !player.track) return;
+    if (inRoom || player.status !== "playing" || !player.track) return;
     let attempt = listeningAttempt.current;
     if (!attempt || attempt.trackId !== player.track.id) {
       const listener = playableListeners.find(item => item.audioTrackId === player.track?.id);
@@ -192,7 +194,7 @@ function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlin
     if (recordedAttempt.current === attempt.id) return;
     recordedAttempt.current = attempt.id;
     dispatch({ type: "event", event: { ...attempt, type: "listen", createdAt: new Date().toISOString() } });
-  }, [player.status, player.track, dispatch, scene]);
+  }, [inRoom, player.status, player.track, dispatch, scene]);
   useEffect(() => {
     if (!isScanning) return;
     const timer = window.setTimeout(() => setIsScanning(false), 650);
@@ -201,7 +203,7 @@ function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlin
 
 
   useResonanceWebTools({ selectListener: listener => openMatch(listener), setView });
-  const showNavigation = view === "radar" || view === "journey";
+  const showNavigation = !inRoom && (view === "radar" || view === "journey");
   function openOnline() { setView("radar"); setRadarSource("online"); }
   useIncomingInviteNotification(incomingInvite, openOnline);
 
@@ -210,18 +212,21 @@ function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlin
       <audio ref={audioRef} preload="metadata" hidden />
       <section className="phone-stage" aria-label="同频音乐体验">
         {showNavigation && <nav className="bottom-nav" aria-label="主要导航"><button type="button" data-active={view === "radar"} aria-current={view === "radar" ? "page" : undefined} onClick={() => setView("radar")}><Compass aria-hidden="true" /><span>附近</span></button><button type="button" data-active={view === "journey"} aria-current={view === "journey" ? "page" : undefined} aria-label={unreadCount ? `足迹与收藏，${unreadCount} 首回歌未读` : "足迹与收藏"} onClick={() => { setJourneyTab(unreadCount ? "received" : "history"); setView("journey"); }}><Footprints aria-hidden="true" /><span>足迹与收藏{unreadCount > 0 && <b className="unread-count" aria-hidden="true">{unreadCount}</b>}</span></button></nav>}
-        {onlineNotice && <button type="button" className="integrated-invite-notice" aria-label={onlineNotice} onClick={openOnline}><Radio size={16} aria-hidden="true" /><span role="status">{onlineNotice}</span><span>查看 →</span></button>}
-        {onlineActive && !(view === "radar" && radarSource === "online") && <div className="integrated-presence"><span>你正对附近可见</span><button type="button" onClick={onPauseOnline}>隐身</button></div>}
-        {exchange && exchange.status !== "choosing" && view !== "exchange" && <button type="button" className="demo-reply-reminder" onClick={viewExchange}><InteractionGlyph kind="exchange" /><span>{exchange.status === "sending" ? "等待 TA 回歌" : "TA 回了一首歌"}</span><span>查看 →</span></button>}
+        {!inRoom && onlineNotice && <button type="button" className="integrated-invite-notice" aria-label={onlineNotice} onClick={openOnline}><Radio size={16} aria-hidden="true" /><span role="status">{onlineNotice}</span><span>查看 →</span></button>}
+        {!inRoom && onlineActive && !(view === "radar" && radarSource === "online") && <div className="integrated-presence"><span>你正对附近可见</span><button type="button" onClick={onPauseOnline}>隐身</button></div>}
+        {!inRoom && exchange && exchange.status !== "choosing" && view !== "exchange" && <button type="button" className="demo-reply-reminder" onClick={viewExchange}><InteractionGlyph kind="exchange" /><span>{exchange.status === "sending" ? "等待 TA 回歌" : "TA 回了一首歌"}</span><span>查看 →</span></button>}
         <div className="phone-stage__content" ref={contentRef}>
+          {roomView?.(player)}
+          {!inRoom && <>
           {view === "radar" && radarSource === "online" && (typeof onlinePanel === "function" ? onlinePanel(player) : onlinePanel)}
           {view === "radar" && radarSource === "demo" && <RadarHome isDiscoverable={isDiscoverable} onDiscoverableChange={value => { setIsDiscoverable(value); setIsScanning(false); }} scene={scene} onSceneChange={changeScene} listeners={listeners} isScanning={isScanning} onRefresh={() => { setScanRound(round => round + 1); setIsScanning(true); }} selectedListener={selectedListener} onSelectListener={listener => setSelectedId(listener.id)} onOpenMatch={() => openMatch()} />}
           {view === "match" && <MatchDetail listener={selectedListener} onBack={() => setView("radar")} onListen={() => void startListening(selectedListener)} onExchange={() => openExchange("match")} />}
           {view === "listening" && player.track && <ListeningSession player={player} reaction={reaction} onReact={kind => { if (player.track) sendReaction(kind, player.track.id); }} isFavorite={library.favoriteIds.includes(player.track.id)} onToggleFavorite={() => player.track && dispatch({ type: library.favoriteIds.includes(player.track.id) ? "removeFavorite" : "favorite", trackId: player.track.id })} onBack={() => { setSelectedId(playbackListener.id); setView(listeningSource); }} onExchange={() => openExchange("listening")} onEnd={() => { player.stop(); setView("radar"); }} />}
           {view === "exchange" && exchange && <SongExchange isSaving={isSavingExchange} listener={exchange.listener} selectedSongId={exchange.selectedId} status={exchange.status} receivedTrack={audioTracks.find(track => track.id === exchange.receivedId) ?? null} onSelectSong={id => setExchange({ ...exchange, id: crypto.randomUUID(), selectedId: id, queuedEvent: undefined })} onSend={sendExchange} onBack={backFromExchange} onBrowse={() => { setView("radar"); setRadarSource("demo"); }} onSave={() => finishExchange("favorite")} onListenLater={() => finishExchange("later")} />}
           {view === "journey" && <JourneySummary key={journeyTab} initialTab={journeyTab} onTabChange={setJourneyTab} received={received} onReadExchange={markExchangeRead} accountBacked onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} library={library} onPlayTrack={playSavedTrack} onRemoveFavorite={trackId => dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => dispatch({ type: "removeLater", trackId })} onReturn={() => setView("radar")} />}
+          </>}
         </div>
-        {!playbackHeader && view !== "listening" && <MiniPlayer player={player} onOpen={() => setView("listening")} />}
+        {!inRoom && !playbackHeader && view !== "listening" && <MiniPlayer player={player} onOpen={() => setView("listening")} />}
       </section>
       {playbackHeader?.(player)}
       <MockHostPanel><label>听众来源<select aria-label="调试听众来源" value={radarSource} onChange={event => { setRadarSource(event.target.value as "demo" | "online"); setView("radar"); }}><option value="demo">模拟听众 · 自动回应</option><option value="online">真实客户端 · 双人联调</option></select></label></MockHostPanel>
