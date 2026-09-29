@@ -13,7 +13,7 @@ export function useIncomingInviteNotification(invite: NearbyInvite | null | unde
     if (!id) return;
     const toastId = `nearby-invite-${id}`;
     const track = audioTracks.find(item => item.id === trackId);
-    toast("有人邀请你一起听", { id: toastId, description: track ? `《${track.track}》` : "打开邀请，选择是否加入", duration: Infinity, action: { label: "查看邀请", onClick: () => open.current() } });
+    toast("有人邀请你一起听", { id: toastId, description: track ? `《${track.track}》` : "点开看看", duration: Infinity, action: { label: "查看邀请", onClick: () => open.current() } });
     return () => { toast.dismiss(toastId); };
   }, [id, trackId]);
 }
@@ -34,9 +34,9 @@ export function useRoomExchangeNotification(room: RoomSnapshot | null, role: Roo
     const toastId = `room-exchange-${key}`;
     const trackId = incoming || from !== role ? offered : response;
     const track = audioTracks.find(item => item.id === trackId);
-    toast(incoming ? "TA 送来一首歌" : "交换完成，收到一首新音乐", {
+    toast(incoming ? "TA 送来一首歌" : "交换成功，收到一首新歌", {
       id: toastId, description: track ? `《${track.track}》` : "查看这次音乐交换", duration: incoming ? Infinity : 8000,
-      action: { label: incoming ? "选歌回应" : "查看回歌", onClick: () => {
+      action: { label: incoming ? "回一首" : "查看回歌", onClick: () => {
         const panel = document.getElementById("room-exchange-panel");
         panel?.scrollIntoView({ block: "start" }); panel?.focus({ preventScroll: true });
       } },

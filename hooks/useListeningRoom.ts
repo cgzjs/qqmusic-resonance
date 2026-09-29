@@ -9,17 +9,17 @@ import { clockOffset, isRoomSnapshot, UUID_PATTERN, type RoomCommand, type RoomR
 
 export type ConnectionState = "idle" | "connecting" | "connected" | "reconnecting" | "error" | "closed";
 const errors: Record<string, string> = {
-  INVALID_TOKEN: "本次同频凭据不可用，请返回附近发现重新邀请。",
-  AUTH_REQUIRED: "无法验证本次同频。",
-  AUTH_TIMEOUT: "连接验证超时，请重试。",
-  ROOM_FULL: "这个房间的席位已被占用；掉线席位会保留 90 秒。",
-  ROOM_CLOSED: "本次同频已结束或过期。",
-  ROOM_NOT_FOUND: "房间不存在或已经结束。",
-  REPLACED: "此席位已在另一个连接中恢复。",
-  HOST_ONLY: "公共播放由分享音乐的一方控制。",
-  STALE_REVISION: "房间状态已更新，请重新操作。",
-  RATE_LIMIT: "操作太快，请稍后再试。",
-  TRACK_UNAVAILABLE: "歌曲已从歌单移除，请返回附近重新选择。",
+  INVALID_TOKEN: "链接已失效，请回附近重新邀请",
+  AUTH_REQUIRED: "验证失败，请回附近重新邀请",
+  AUTH_TIMEOUT: "连接超时，请重试",
+  ROOM_FULL: "房间已满，刚掉线的话稍等再进",
+  ROOM_CLOSED: "一起听已结束",
+  ROOM_NOT_FOUND: "房间已关闭",
+  REPLACED: "已在另一个页面进入房间",
+  HOST_ONLY: "播放由分享歌曲的一方控制。",
+  STALE_REVISION: "房间有变化，请重新操作",
+  RATE_LIMIT: "太快啦，稍等再试",
+  TRACK_UNAVAILABLE: "这首歌已下架，换一首吧",
 };
 
 export function useListeningRoom(roomId: string) {
@@ -70,7 +70,7 @@ export function useListeningRoom(roomId: string) {
     incomingDeadline.current = null; setIncomingReaction(null);
     settleReaction("failed", "CONNECTION_LOST");
     if (exchangeTimer.current) clearTimeout(exchangeTimer.current);
-    if (exchangeCommandRef.current) { setExchangeRequest("uncertain"); setExchangeError("连接中断，操作结果尚未确认。连接后可重试确认。"); }
+    if (exchangeCommandRef.current) { setExchangeRequest("uncertain"); setExchangeError("连接断开，操作结果待确认"); }
   }, [settleReaction]);
 
   const clearTimers = useCallback(() => {
@@ -86,7 +86,7 @@ export function useListeningRoom(roomId: string) {
     synchronizedRef.current = false; resumePingRef.current = null;
     const generation = ++generationRef.current;
     socketRef.current?.close();
-    if (!navigator.onLine) { setConnection("reconnecting"); setError("网络已断开，恢复后重新确认播放状态。"); return; }
+    if (!navigator.onLine) { setConnection("reconnecting"); setError("网络已断开，连上后自动同步"); return; }
     setConnection(attemptsRef.current ? "reconnecting" : "connecting");
     const retry = () => {
       if (generation !== generationRef.current || leavingRef.current) return;
@@ -95,7 +95,7 @@ export function useListeningRoom(roomId: string) {
       clearTimers();
       synchronizedRef.current = false;
       clearReactions();
-      if (attemptsRef.current >= 8) { setConnection("error"); setError("暂时无法连接房间，请检查网络后重试。"); return; }
+      if (attemptsRef.current >= 8) { setConnection("error"); setError("连不上房间，请检查网络"); return; }
       const delay = Math.min(750 * 2 ** attemptsRef.current++, 8000);
       setConnection("reconnecting");
       timerRef.current = setTimeout(openConnection, delay);
@@ -132,8 +132,8 @@ export function useListeningRoom(roomId: string) {
           if (message.type === "exchange-result" && message.requestId === exchangeCommandRef.current?.id) {
             if (exchangeTimer.current) clearTimeout(exchangeTimer.current);
             exchangeTimer.current = null; exchangeCommandRef.current = null; setExchangeRequest("idle");
-            const reasons: Record<string, string> = { EXCHANGE_BUSY: "对方已经发起交换，请先处理当前这份。", EXCHANGE_STALE: "这次操作已过期，请重新选择操作。", EXCHANGE_FINISHED: "这份交换已结束或到期。", EXCHANGE_FORBIDDEN: "只有接收方能回应，发起方可以撤回。", EXCHANGE_INVALID_REPLY: "请选择与收到的歌不同的一首。", EXCHANGE_CONFLICT: "操作编号冲突，请重新操作。", EXCHANGE_LIMIT: "还有交换结果等待保存，或本次会话已达到交换上限。", PEER_OFFLINE: "对方暂时离线，恢复连接后再送出。", EXCHANGE_ACCOUNT_REQUIRED: "请通过附近邀请进入有账号授权的同频。", INVALID_TRACK: "这首歌暂不可交换。", RATE_LIMIT: "操作太快，请稍后再试。" };
-            setExchangeError(message.error ? reasons[message.error] ?? "交换操作未完成，请重试。" : null);
+            const reasons: Record<string, string> = { EXCHANGE_BUSY: "TA 已送来一首，先回应吧", EXCHANGE_STALE: "操作已过期，请重试", EXCHANGE_FINISHED: "交换已结束", EXCHANGE_FORBIDDEN: "等 TA 回应，或撤回这首", EXCHANGE_INVALID_REPLY: "换一首不一样的歌", EXCHANGE_CONFLICT: "操作失败，请重试", EXCHANGE_LIMIT: "交换次数已用完，或上次还在保存", PEER_OFFLINE: "TA 暂时掉线了", EXCHANGE_ACCOUNT_REQUIRED: "请先从附近邀请 TA 一起听", INVALID_TRACK: "这首歌暂不可交换。", RATE_LIMIT: "太快啦，稍等再试" };
+            setExchangeError(message.error ? reasons[message.error] ?? "交换失败，请重试" : null);
           }
           if (message.type === "reaction-status" && message.id === outgoingRef.current?.id && ["sent", "received", "failed"].includes(message.status)) {
             settleReaction(message.status, typeof message.error === "string" ? message.error : undefined); return;
@@ -152,10 +152,10 @@ export function useListeningRoom(roomId: string) {
             }
             socket.send(JSON.stringify({ type: "reaction-received", id: item.id })); return;
           }
-          if (message.type === "error") { setError(errors[message.error] ?? "房间操作未完成，请重试。"); return; }
+          if (message.type === "error") { setError(errors[message.error] ?? "操作失败，请重试"); return; }
           if (!["welcome", "state", "exchange-result"].includes(message.type) || !isRoomSnapshot(message.room) || message.room.id !== roomId || !Number.isFinite(message.serverTime)) return;
           if (message.room.catalogVersion && message.room.catalogVersion !== catalogVersion) {
-            leavingRef.current = true; clearTimers(); clearReactions(); socket.close(); setConnection("error"); setError("歌单已更新，请刷新页面后重新进入同频。"); return;
+            leavingRef.current = true; clearTimers(); clearReactions(); socket.close(); setConnection("error"); setError("歌单已更新，请刷新页面"); return;
           }
           if (snapshotRef.current && message.room.revision < snapshotRef.current.revision) return;
           lastMessageRef.current = Date.now();
@@ -197,7 +197,7 @@ export function useListeningRoom(roomId: string) {
           if ([4001, 4003, 4004, 4005].includes(event.code)) {
             leavingRef.current = true;
             setConnection(event.code === 4004 ? "closed" : "error");
-            setError(errors[event.reason] ?? "无法加入同频，请返回附近发现重新邀请。");
+            setError(errors[event.reason] ?? "加入失败，请回附近重新邀请");
             return;
           }
           retry();
@@ -211,7 +211,7 @@ export function useListeningRoom(roomId: string) {
       if (!credentialsRef.current || leavingRef.current) return;
       synchronizedRef.current = false; generationRef.current++;
       clearTimers(); clearReactions(); socketRef.current?.close();
-      setConnection("reconnecting"); setError("网络已断开，恢复后重新确认播放状态。");
+      setConnection("reconnecting"); setError("网络已断开，连上后自动同步");
     };
     const resume = () => {
       if (document.visibilityState === "hidden" || !navigator.onLine || !credentialsRef.current || leavingRef.current) return;
@@ -290,7 +290,7 @@ export function useListeningRoom(roomId: string) {
     if (socketRef.current?.readyState !== WebSocket.OPEN || snapshotRef.current?.closed) return;
     exchangeCommandRef.current = command; setExchangeRequest("sending"); setExchangeError(null);
     if (exchangeTimer.current) clearTimeout(exchangeTimer.current);
-    exchangeTimer.current = setTimeout(() => { setExchangeRequest("uncertain"); setExchangeError("暂未确认操作结果，请重试确认；不会重复送出。"); }, 8000);
+    exchangeTimer.current = setTimeout(() => { setExchangeRequest("uncertain"); setExchangeError("送达未确认，可重试，不会重复送出"); }, 8000);
     socketRef.current.send(JSON.stringify(command));
   }, [isSynchronized]);
   const sendExchange = useCallback((action: ExchangeCommand["action"], values: { exchangeId?: string; trackId?: string } = {}) => {

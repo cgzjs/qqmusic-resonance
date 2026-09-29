@@ -24,7 +24,7 @@ async function restore(force = false): Promise<HostSnapshot> {
   try {
     const config = await (await hostFetch("config", null)).json() as { demo: boolean };
     if (run !== generation) return state;
-    if (!config.demo) return emit({ status: "unavailable", session: null, trackId: null, error: "尚未接入 QQ 音乐宿主授权，请在已接入的宿主中打开。" });
+    if (!config.demo) return emit({ status: "unavailable", session: null, trackId: null, error: "请在 QQ 音乐里打开同频。" });
     const selected = sessionStorage.getItem("resonance.mock-host.slot");
     if (selected !== "A" && selected !== "B") return emit({ status: "signed-out", session: null, trackId: null, error: null });
     slot = selected;
@@ -46,7 +46,7 @@ async function restore(force = false): Promise<HostSnapshot> {
     if (run !== generation) return state;
     if (!identity) return emit({ status: "signed-out", session: null, trackId: null, error: null });
     const response = await fetch("/api/host/resume", { method: "POST", headers: { "Content-Type": "application/json", "X-Account-Id": identity.accountId }, body: JSON.stringify({ deviceKey: identity.deviceKey }), signal: AbortSignal.timeout(8000) });
-    if (!response.ok) throw new Error("无法恢复登录状态，请稍后重试。");
+    if (!response.ok) throw new Error("无法恢复登录，请稍后重试");
     const session = await response.json() as HostSession;
     if (run !== generation) return state;
     localStorage.setItem(selectedIdentityKey, JSON.stringify({ ...identity, signedOut: false }));
@@ -55,7 +55,7 @@ async function restore(force = false): Promise<HostSnapshot> {
     return emit({ status: "ready", session, trackId, error: null });
   } catch (error) {
     if (run !== generation) return state;
-    return emit({ status: "unavailable", session: null, trackId: null, error: error instanceof Error && error.message.startsWith("无法") ? error.message : "暂时无法读取登录状态。请检查网络与浏览器存储权限后重试。" });
+    return emit({ status: "unavailable", session: null, trackId: null, error: error instanceof Error && error.message.startsWith("无法") ? error.message : "读取登录失败，请检查网络后重试" });
   }
 }
 
@@ -76,5 +76,5 @@ export const demoHost: HostAdapter & { chooseAccount(): void; switchAccount(slot
     sessionStorage.removeItem("resonance.mock-host.slot");
     generation++; emit({ status: "signed-out", session: null, trackId: null, error: null });
   },
-  expire() { generation++; emit({ status: "expired", session: null, trackId: null, error: "宿主授权已失效，发现与播放已停止。" }); },
+  expire() { generation++; emit({ status: "expired", session: null, trackId: null, error: "登录已过期，已停止播放" }); },
 };

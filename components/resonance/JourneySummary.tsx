@@ -95,7 +95,7 @@ export function JourneySummary({ library, onPlayTrack, onRemoveFavorite, onRemov
               const kind = event.origin === "online" ? "online" : event.type;
               const Icon = eventIcons[kind];
               const verb = eventVerbs[event.type];
-              const what = event.origin === "online-exchange" ? "在线交换" : event.origin === "online" ? "在线同频" : event.scene ? `在${sceneLabels[event.scene]}${verb}` : verb;
+              const what = event.origin === "online-exchange" ? "一起听时交换" : event.origin === "online" ? "和 TA 一起听" : event.scene ? `在${sceneLabels[event.scene]}${verb}` : verb;
               return <Fragment key={event.id}>{newDay && <h3 className="tp-day">{dayLabel(date)}</h3>}<article className="journey-event tp-event" data-kind={kind}>
                 <span className="tp-node" aria-hidden="true"><Icon size={14} strokeWidth={2} /></span>
                 <p className="tp-event-meta"><span>{what}</span><time dateTime={event.createdAt}>{clockTime(date)}</time></p>

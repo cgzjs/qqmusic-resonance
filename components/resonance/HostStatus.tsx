@@ -9,7 +9,7 @@ import { audioTracks } from "@/lib/resonance/demo-data";
 export function HostStatus() {
   const host = useHost();
   if (host.status === "signed-out" || host.status === "expired") return <LoginPicker expired={host.status === "expired"} />;
-  return <section className="plugin-host-status" role="status"><Radio size={28} aria-hidden="true" /><h2>{host.status === "loading" ? "正在读取登录状态" : "连接暂不可用"}</h2><p>{host.error ?? "同频沿用 QQ 音乐账号，不需要另外注册。"}</p>{host.status !== "loading" && <button className="room-primary" onClick={() => void demoHost.requestAuthorization()}><RefreshCw size={16} aria-hidden="true" />重新连接</button>}</section>;
+  return <section className="plugin-host-status" role="status"><Radio size={28} aria-hidden="true" /><h2>{host.status === "loading" ? "正在读取登录状态" : "暂时连不上"}</h2><p>{host.error ?? "用 QQ 音乐账号登录，无需注册"}</p>{host.status !== "loading" && <button className="room-primary" onClick={() => void demoHost.requestAuthorization()}><RefreshCw size={16} aria-hidden="true" />重新连接</button>}</section>;
 }
 
 function LoginPicker({ expired }: { expired: boolean }) {
@@ -20,13 +20,13 @@ function LoginPicker({ expired }: { expired: boolean }) {
     setBusy(slot); setError("");
     try {
       const result = await demoHost.switchAccount(slot);
-      if (result.status !== "ready") setError(result.error ?? "登录未完成，请重试。");
-    } catch { setError("登录未完成，请检查浏览器存储权限后重试。"); }
+      if (result.status !== "ready") setError(result.error ?? "登录失败，请重试");
+    } catch { setError("登录失败，请允许浏览器保存网站数据"); }
     finally { setBusy(null); }
   }
   return <section className="account-login" aria-labelledby="account-login-title">
     <div className="login-heading">
-      <div><p className="login-kicker"><span />RESONANCE / SIGN IN</p><h1 id="account-login-title">登录<span>同频</span></h1><p className="login-subtitle">{expired ? "重新登录，继续这场相遇。" : "好音乐，值得一起听。"}</p></div>
+      <div><p className="login-kicker"><span />RESONANCE / SIGN IN</p><h1 id="account-login-title">登录<span>同频</span></h1><p className="login-subtitle">{expired ? "登录已过期，请重新登录" : "好音乐，值得一起听。"}</p></div>
       <div className="login-orbit" aria-hidden="true"><span className="login-orbit-ring" /><span className="login-orbit-core"><Headphones size={28} strokeWidth={1.3} /></span><span className="login-orbit-star" /><span className="login-orbit-note" /></div>
     </div>
     <div className="login-selection-label"><span>选择你的身份</span><span aria-hidden="true">A / B</span></div>
@@ -45,7 +45,7 @@ export function AccountControls() {
   const [error, setError] = useState("");
   async function logout() {
     setBusy(true); setError("");
-    try { await demoHost.logout(); } catch { setError("退出未完成，请重试。"); } finally { setBusy(false); }
+    try { await demoHost.logout(); } catch { setError("退出失败，请重试"); } finally { setBusy(false); }
   }
   return <div className="account-controls"><button type="button" disabled={busy} onClick={() => demoHost.chooseAccount()}>切换账号</button><button type="button" disabled={busy} onClick={() => void logout()}>{busy ? "正在退出…" : "退出登录"}</button>{error && <span role="alert">{error}</span>}</div>;
 }

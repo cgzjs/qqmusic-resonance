@@ -7,9 +7,9 @@ export function InteractionGlyph({ kind, className = "" }: { kind: ReactionKind 
   return <span className={`interaction-glyph ${className}`} data-kind={kind} aria-hidden="true" />;
 }
 const errors: Record<string, string> = {
-  RATE_LIMIT: "慢一点，给回应留点时间。", PEER_OFFLINE: "对方暂时离线，连接后再回应。",
-  TRACK_CHANGED: "歌曲刚刚更新，请重新回应。", REACTION_EXPIRED: "这条回应已过期，请重新发送。",
-  CONNECTION_LOST: "连接中断，这条回应未确认送达。", DELIVERY_UNCONFIRMED: "暂未确认送达，可稍后再发。",
+  RATE_LIMIT: "慢一点，给回应留点时间。", PEER_OFFLINE: "TA 暂时掉线了",
+  TRACK_CHANGED: "刚换了歌，请重新回应", REACTION_EXPIRED: "回应已过期，请重发",
+  CONNECTION_LOST: "连接断开，可能未送达", DELIVERY_UNCONFIRMED: "暂未确认送达，稍后再发",
 };
 
 type Props = { mode: "demo" | "online"; disabled?: boolean; disabledHint?: string; outgoing?: ReactionDelivery | null; incoming?: RoomReaction | null; onSend: (kind: ReactionKind) => void; quiet?: boolean; onQuietChange?: (quiet: boolean) => void };
@@ -32,11 +32,11 @@ export function ReactionDock({ mode, disabled = false, disabledHint = "等双方
   }
   const caption = mode === "demo" ? current?.status === "failed" ? "暂未确认送出，请重试。" : current?.status === "sending" ? "正在送出…" : busy ? "已送出，等 TA 回应。可以先去逛逛" : current?.status === "received" ? current.kind === "wave" ? "TA 也向你挥了挥手" : "TA 也喜欢这首歌" : "用一个小回应，接住这首歌" :
     disabled ? disabledHint : current?.status === "failed" ? errors[current.error ?? ""] ?? "发送未完成，请重试。" :
-    current?.status === "sending" ? "正在发送…" : current?.status === "sent" ? "已发出，等待对方客户端确认…" : current?.status === "received" ? "已送达对方" : "用一个小回应，接住这首歌";
+    current?.status === "sending" ? "正在发送…" : current?.status === "sent" ? "已发出，等 TA 收到…" : current?.status === "received" ? "已送达对方" : "用一个小回应，接住这首歌";
   const delivered = current?.status === "received" ? current : null;
   const incomingTrack = audioTracks.find(track => track.id === incoming?.trackId)?.track;
   return <section className="reaction-dock" data-quiet={quiet} aria-label="音乐回应">
-    <div className="reaction-dock-heading"><span>小小回应</span><button type="button" aria-pressed={quiet} onClick={toggleQuiet}>{quiet ? "开启动效" : "静态效果"}</button></div>
+    <div className="reaction-dock-heading"><span>小小回应</span><button type="button" aria-pressed={quiet} onClick={toggleQuiet}>{quiet ? "打开动画" : "关闭动画"}</button></div>
     <div className="reaction-signal" aria-hidden="true"><span className="reaction-endpoint">YOU</span><span className="reaction-rail" /><span className="reaction-endpoint">TA</span>
       <span className="reaction-star reaction-star--one" /><span className="reaction-star reaction-star--two" />
       {!delivered && !incoming && <span className="reaction-idle-note" />}

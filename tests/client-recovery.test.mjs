@@ -170,7 +170,7 @@ test("invitation clock advances offline, disables acceptance and does not auto-s
   assert.equal(calls.length, count);
   respond = async () => response({ error: "SESSION_EXPIRED" }, 401);
   await network(true);
-  assert.equal(current.snapshot, null); assert.match(current.error, /发现已暂停/);
+  assert.equal(current.snapshot, null); assert.match(current.error, /已自动隐身/);
   assert.equal(calls.filter(item => item.url?.endsWith("start")).length, 1);
 });
 
@@ -237,7 +237,7 @@ test("online reaction never invents a simulated reply after the demo duration", 
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
   await act(async () => root.render(React.createElement(ReactionDock, { mode: "online", outgoing: { id: token, kind: "heart", status: "sent" }, onSend() {} })));
   await act(async () => t.mock.timers.tick(3000));
-  assert.match(document.body.textContent, /等待对方客户端确认/);
+  assert.match(document.body.textContent, /已发出，等 TA 收到/);
   assert.equal(document.querySelector(".demo-response-motion"), null);
   assert.equal(document.body.textContent.includes("TA 也喜欢这首歌"), false);
 });
@@ -398,7 +398,7 @@ test("blocking requires confirmation, leaves failed requests retryable, and repo
   const confirm = () => [...document.querySelectorAll('button')].find(button => button.textContent === '确认屏蔽');
   await act(async () => confirm().click());
   assert.equal(completed, 0);
-  assert.match(document.querySelector('[role="alert"]').textContent, /结果尚未确认/);
+  assert.match(document.querySelector('[role="alert"]').textContent, /结果未确认/);
   respond = async () => response({ blocks: [{ id: token, alias: '听众 B', createdAt: Date.now() }] });
   await act(async () => confirm().click());
   assert.equal(completed, 1);

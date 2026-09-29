@@ -42,13 +42,13 @@ export function RadarHome({
         </div>
         <div className="discoverable-control">
           <div>
-            <strong>{isDiscoverable ? "发现已开启" : "发现已暂停"}</strong>
+            <strong>{isDiscoverable ? "附近可见" : "已隐身"}</strong>
             <span>音乐相遇</span>
           </div>
           <Switch
             checked={isDiscoverable}
             onCheckedChange={onDiscoverableChange}
-            aria-label="开启附近发现"
+            aria-label="对附近可见"
             className="data-[state=checked]:bg-[#6feee1]"
           />
         </div>
@@ -67,13 +67,13 @@ export function RadarHome({
             ))}
           </SelectContent>
         </Select>
-        <span className="scene-bar__count">{!isDiscoverable ? "发现已暂停" : isScanning ? "正在寻找" : `${listeners.length} 首歌`}</span>
+        <span className="scene-bar__count">{!isDiscoverable ? "已隐身" : isScanning ? "正在寻找" : `${listeners.length} 首歌`}</span>
       </div>
 
       <div className="radar-heading">
         <div>
           <p className="section-kicker"><Radio aria-hidden="true" size={14} /> 附近动态</p>
-          <h2>{isDiscoverable ? "听见附近的此刻" : "发现已暂停"}</h2>
+          <h2>{isDiscoverable ? "听见附近的此刻" : "已隐身"}</h2>
         </div>
         <button type="button" className="refresh-radar" disabled={!isDiscoverable || isScanning} onClick={onRefresh} aria-label="刷新附近"><RefreshCw size={16} aria-hidden="true" />刷新</button>
       </div>
@@ -91,7 +91,7 @@ export function RadarHome({
             <strong>继续发现</strong>
           </button>
         )}
-        {isDiscoverable && (isScanning || listeners.length === 0) && <div className="radar-empty" role="status"><Radio aria-hidden="true" /><strong>{isScanning ? "正在寻找附近的音乐" : "这里暂时没有音乐信号"}</strong><span>{isScanning ? "正在寻找新的音乐" : "试试其他场景，或再次刷新"}</span></div>}
+        {isDiscoverable && (isScanning || listeners.length === 0) && <div className="radar-empty" role="status"><Radio aria-hidden="true" /><strong>{isScanning ? "正在寻找附近的音乐" : "这里暂时没人在听歌"}</strong><span>{isScanning ? "正在寻找新的音乐" : "试试其他场景，或再次刷新"}</span></div>}
       </div>
 
       {isDiscoverable && !isScanning && listeners.length > 0 && (

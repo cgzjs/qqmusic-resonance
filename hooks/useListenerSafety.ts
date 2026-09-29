@@ -24,12 +24,12 @@ export function useListenerSafety() {
       if (inFlight.current !== controller) return null;
       if (!response.ok) {
         if (response.status === 401) demoHost.expire();
-        throw new Error(result.error === "BLOCK_LIMIT" ? "最多屏蔽 100 位听众，请先整理列表。" : result.error === "UNAVAILABLE" ? "对方已离开，请刷新后重试。" : response.status === 401 ? "登录已失效，请重新登录。" : "操作未完成，请重试。");
+        throw new Error(result.error === "BLOCK_LIMIT" ? "最多屏蔽 100 人" : result.error === "UNAVAILABLE" ? "TA 已离开" : response.status === 401 ? "登录已过期，请重新登录。" : "操作失败，请重试");
       }
       setState({ owner, busy: false, error: "" });
       return result;
     } catch (reason) {
-      if (inFlight.current === controller) setState({ owner, busy: false, error: reason instanceof Error && !["AbortError", "TypeError"].includes(reason.name) ? reason.message : action === "blocks" ? "暂时无法读取，请重试。" : "结果尚未确认，请重试或查看已屏蔽听众。" });
+      if (inFlight.current === controller) setState({ owner, busy: false, error: reason instanceof Error && !["AbortError", "TypeError"].includes(reason.name) ? reason.message : action === "blocks" ? "加载失败，请重试" : "结果未确认，请重试" });
       return null;
     } finally {
       clearTimeout(deadline);

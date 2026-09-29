@@ -37,9 +37,9 @@ function ConnectedNearby({ session, initialSource }: { session: HostSession; ini
     void request(track ? "track" : "stop", track ? { trackId: track.id } : {});
   }, [track, snapshot, request, ready]);
   const invite = snapshot?.invite;
-  const notice = invite?.status === "pending" ? invite.to === snapshot?.self.id ? "收到在线同频邀请" : "在线邀请正在等待回应" : null;
+  const notice = invite?.status === "pending" ? invite.to === snapshot?.self.id ? "有人邀请你一起听" : "邀请已发出，等 TA 回应" : null;
   return <>
-    {host.dataError && <div className="room-error integrated-error" role="alert">{host.dataError}<button className="room-secondary" onClick={host.refreshData}>重试读取</button></div>}
-    {host.dataLoading ? <p className="plugin-host-status" role="status">正在读取账号足迹…</p> : <ResonanceExperience playbackHeader={player => <CurrentPlaybackBar player={player} />} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineNotice={notice} incomingInvite={invite?.status === "pending" && invite.to === snapshot?.self.id ? invite : null} onlineActive={!!snapshot && !snapshot.ticket} onPauseOnline={() => { if (!busy) void request("stop", {}); }} />}
+    {host.dataError && <div className="room-error integrated-error" role="alert">{host.dataError}<button className="room-secondary" onClick={host.refreshData}>重新加载</button></div>}
+    {host.dataLoading ? <p className="plugin-host-status" role="status">正在加载你的足迹…</p> : <ResonanceExperience playbackHeader={player => <CurrentPlaybackBar player={player} />} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineNotice={notice} incomingInvite={invite?.status === "pending" && invite.to === snapshot?.self.id ? invite : null} onlineActive={!!snapshot && !snapshot.ticket} onPauseOnline={() => { if (!busy) void request("stop", {}); }} />}
   </>;
 }

@@ -7,11 +7,11 @@ import { accountHeaders, type HostSession } from "@/lib/resonance/host-protocol"
 import { demoHost } from "@/lib/resonance/demo-host";
 
 const messages: Record<string, string> = {
-  AUTH_EXPIRED: "宿主授权已失效，请重新读取登录状态。", ALREADY_DISCOVERING: "当前账号已在另一页开启发现；异常离线状态最多保留 30 秒。",
-  SESSION_EXPIRED: "发现已暂停，请重新开启。", UNAVAILABLE: "对方已离开，试试其他音乐吧。",
-  BUSY: "你或对方已有一份待处理邀请，请稍后再试。", COOLDOWN: "稍等片刻再邀请；同一听众每分钟可邀请一次。",
-  INVITE_EXPIRED: "邀请已失效，请查看最新状态。", AREA_FULL: "当前听众较多，请稍后再试。",
-  FORBIDDEN: "这份邀请不能由你处理。",
+  AUTH_EXPIRED: "登录已过期，请重新登录。", ALREADY_DISCOVERING: "已在另一个页面打开，请先关掉那边",
+  SESSION_EXPIRED: "连接超时，已自动隐身", UNAVAILABLE: "TA 已离开",
+  BUSY: "还有未处理的邀请，稍后再试", COOLDOWN: "刚邀请过，一分钟后再试",
+  INVITE_EXPIRED: "邀请已失效", AREA_FULL: "附近人太多，稍后再试",
+  FORBIDDEN: "你不能处理这个邀请。",
 };
 
 const subscribeNetwork = (notify: () => void) => {
@@ -45,7 +45,7 @@ export function useNearby(session: HostSession) {
       sessionStorage.setItem(`resonance.nearby-room.${session.accountId}.${next.ticket.roomId}`, next.ticket.token);
       enteringRef.current = true;
       router.push(`/room/${next.ticket.roomId}`);
-    } catch { setError("浏览器无法保存本次会话，请允许此站点使用会话存储后重试。"); }
+    } catch { setError("请允许浏览器保存网站数据"); }
   }, [router, session.accountId]);
 
   const request = useCallback(async function perform(action: string, body?: object) {
@@ -53,9 +53,9 @@ export function useNearby(session: HostSession) {
       const token = tokenRef.current;
       epoch.current++; tokenRef.current = null; readyRef.current = false;
       setSnapshot(null); setReady(false);
-      setError(navigator.onLine ? null : "已暂停发现；服务器上的离线状态最多保留 30 秒。");
+      setError(navigator.onLine ? null : "已隐身，约半分钟后完全生效");
       if (token) void fetch("/api/nearby/stop", { method: "POST", headers: { "Content-Type": "application/json", ...accountHeaders(session), Authorization: `Bearer ${token}` }, body: "{}", keepalive: true }).catch(() => {
-        if (mountedRef.current && !tokenRef.current) setError("已暂停发现；服务器上的离线状态最多保留 30 秒。");
+        if (mountedRef.current && !tokenRef.current) setError("已隐身，约半分钟后完全生效");
       });
       return;
     }
@@ -88,7 +88,7 @@ export function useNearby(session: HostSession) {
       if (!response.ok) {
         if (result.error === "AUTH_EXPIRED") demoHost.expire();
         if (response.status === 401) { tokenRef.current = null; setSnapshot(null); }
-        throw new Error(messages[result.error ?? ""] ?? "暂时无法完成操作，请重试。");
+        throw new Error(messages[result.error ?? ""] ?? "操作失败，请重试");
       }
       confirmedAt.current = Date.now();
       serverOffset.current = Number.isFinite(result.serverTime) ? result.serverTime - confirmedAt.current : 0;
@@ -99,7 +99,7 @@ export function useNearby(session: HostSession) {
     } catch (reason) {
       if (mountedRef.current && startedEpoch === epoch.current) {
         readyRef.current = false; setReady(false);
-        setError(reason instanceof Error && reason.name !== "AbortError" && reason.name !== "TypeError" ? reason.message : action === "start" ? "尚未确认是否开启成功，请稍后重试；未恢复的发现会在 30 秒后自动暂停。" : "连接暂时中断，正在确认最新状态；暂不可发送或回应邀请。");
+        setError(reason instanceof Error && reason.name !== "AbortError" && reason.name !== "TypeError" ? reason.message : action === "start" ? "暂未连上，请稍后再试" : "连接不稳，正在重连…");
       }
     } finally {
       clearTimeout(deadline); pendingRef.current = false;
@@ -118,11 +118,11 @@ export function useNearby(session: HostSession) {
       if (tokenRef.current && Date.now() - confirmedAt.current > 8000) { readyRef.current = false; setReady(false); }
     }, 1000);
     const invalidate = () => { epoch.current++; readyRef.current = false; setReady(false); };
-    const offline = () => { invalidate(); setError("网络已断开，恢复连接后确认发现和邀请状态。"); };
+    const offline = () => { invalidate(); setError("网络已断开，连上后自动恢复"); };
     const restore = () => {
       if (document.visibilityState === "hidden" || enteringRef.current) return;
       invalidate();
-      if (tokenRef.current) { setError("正在确认最新发现状态…"); void request("state"); }
+      if (tokenRef.current) { setError("正在刷新附近…"); void request("state"); }
       else if (navigator.onLine) setError(null);
     };
     const stopPresence = () => {

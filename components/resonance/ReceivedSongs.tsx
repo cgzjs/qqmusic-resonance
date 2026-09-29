@@ -50,7 +50,7 @@ export function ReceivedSongs({ items, onRead, onPlay }: Props) {
       <div id={panelId} hidden={!opened} className="tp-letter-detail">
         <p>你送出《{sent?.track ?? "已移除的歌曲"}》，TA 回了这首。</p>
         {track?.available ? <button type="button" className="tp-btn tp-btn--quiet" onClick={() => onPlay(track)}><Play size={16} aria-hidden="true" />试听这首歌</button> : <p>歌曲已下架，交换记录仍保留。</p>}
-        {savingId === item.id && <p role="status">正在更新已读状态…</p>}
+        {savingId === item.id && <p role="status">正在标为已读…</p>}
         {errorId === item.id && <p className="tp-error" role="alert">已读状态未保存。<button type="button" className="tp-link" onClick={() => void markRead(item)}>重试</button></p>}
       </div>
     </article></Fragment>;

@@ -53,7 +53,7 @@ function EmptyPlaylistExperience() {
     const id = `demo-reply-${reply.id}`; notices.current.add(id);
     toast(reply.kind === "exchange" ? "TA 回了你一首歌" : "TA 回应了你", { id, description: reply.kind === "exchange" ? "交换记录已留在收到的歌里" : "来自刚才那首歌的相遇" });
   });
-  return <section className="empty-playlist"><h2>歌单还没有歌曲</h2><p>添加歌曲后即可开始同频；已有收藏和记录仍然保留。</p><JourneySummary initialTab={unreadCount ? "received" : "history"} received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><MockHostPanel /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
+  return <section className="empty-playlist"><h2>歌单还没有歌曲</h2><p>添加歌曲后即可开始，收藏和足迹仍在</p><JourneySummary initialTab={unreadCount ? "received" : "history"} received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><MockHostPanel /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
 }
 function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlineNotice, incomingInvite, onlineActive, onPauseOnline, initialSource }: ExperienceProps) {
   const { library, dispatch, onlineHistory, onlineExchanges, received, markExchangeRead, unreadCount, queueExchange, demoReplies } = useAccountLibrary();
@@ -154,7 +154,7 @@ function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlin
     if (!saved) {
       setExchange(current => current?.id === event.id ? { ...current, status: "choosing" } : current);
       const id = `demo-exchange-error-${event.id}`; replyToasts.current.add(id);
-      toast("暂未确认送出，请重试", { id, description: "恢复连接后会核对这次请求", action: { label: "查看", onClick: () => setView("exchange") } });
+      toast("暂未确认送出，请重试", { id, description: "联网后自动确认", action: { label: "查看", onClick: () => setView("exchange") } });
     }
   }
   async function finishExchange(destination: "favorite" | "later") {
@@ -211,7 +211,7 @@ function PopulatedExperience({ playbackHeader, onTrackChange, onlinePanel, onlin
       <section className="phone-stage" aria-label="同频音乐体验">
         {showNavigation && <nav className="bottom-nav" aria-label="主要导航"><button type="button" data-active={view === "radar"} aria-current={view === "radar" ? "page" : undefined} onClick={() => setView("radar")}><Compass aria-hidden="true" /><span>附近</span></button><button type="button" data-active={view === "journey"} aria-current={view === "journey" ? "page" : undefined} aria-label={unreadCount ? `足迹与收藏，${unreadCount} 首回歌未读` : "足迹与收藏"} onClick={() => { setJourneyTab(unreadCount ? "received" : "history"); setView("journey"); }}><Footprints aria-hidden="true" /><span>足迹与收藏{unreadCount > 0 && <b className="unread-count" aria-hidden="true">{unreadCount}</b>}</span></button></nav>}
         {onlineNotice && <button type="button" className="integrated-invite-notice" aria-label={onlineNotice} onClick={openOnline}><Radio size={16} aria-hidden="true" /><span role="status">{onlineNotice}</span><span>查看 →</span></button>}
-        {onlineActive && !(view === "radar" && radarSource === "online") && <div className="integrated-presence"><span>真人联调发现已开启</span><button type="button" onClick={onPauseOnline}>暂停在线发现</button></div>}
+        {onlineActive && !(view === "radar" && radarSource === "online") && <div className="integrated-presence"><span>你正对附近可见</span><button type="button" onClick={onPauseOnline}>隐身</button></div>}
         {exchange && exchange.status !== "choosing" && view !== "exchange" && <button type="button" className="demo-reply-reminder" onClick={viewExchange}><InteractionGlyph kind="exchange" /><span>{exchange.status === "sending" ? "等待 TA 回歌" : "TA 回了一首歌"}</span><span>查看 →</span></button>}
         <div className="phone-stage__content" ref={contentRef}>
           {view === "radar" && radarSource === "online" && (typeof onlinePanel === "function" ? onlinePanel(player) : onlinePanel)}

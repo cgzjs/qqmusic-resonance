@@ -18,8 +18,8 @@ export function BlockListenerButton({ target, alias, disabled, onBlocked }: Bloc
     setDone(true); setConfirming(false); onBlocked?.();
   }
   return <div className="listener-safety">
-    {done ? <p role="status">已屏蔽，可在设置中解除。</p> : confirming ? <div className="listener-block-confirm" role="group" aria-label={`屏蔽${alias}`}>
-      <p>屏蔽后互不出现在附近，也无法邀请。{"roomId" in target ? "本次共听将结束。" : "待处理邀请会取消。"}</p>
+    {done ? <p role="status">已屏蔽，可在设置里解除</p> : confirming ? <div className="listener-block-confirm" role="group" aria-label={`屏蔽${alias}`}>
+      <p>屏蔽后互相看不到，也无法邀请。{"roomId" in target ? "一起听会结束。" : "邀请会取消。"}</p>
       <div><button type="button" className="room-secondary" disabled={busy} onClick={() => setConfirming(false)}>取消</button><button type="button" className="room-secondary" disabled={busy || disabled} onClick={() => void block()}>{busy ? "正在屏蔽…" : "确认屏蔽"}</button></div>
     </div> : <button type="button" className="listener-block-trigger" disabled={disabled} aria-label={`屏蔽${alias}`} onClick={() => setConfirming(true)}><Ban size={14} aria-hidden="true" />屏蔽</button>}
     {error && <p className="listener-safety-error" role="alert">{error}</p>}
@@ -48,13 +48,13 @@ function BlockedList() {
   async function refresh() { const result = await run("blocks"); if (result) setEntries(result.blocks); }
   async function unblock(id: string) {
     const result = await run("unblock", { id });
-    if (result) { setEntries(result.blocks); setNotice("已解除屏蔽，旧邀请和共听不会恢复。"); }
+    if (result) { setEntries(result.blocks); setNotice("已解除屏蔽"); }
   }
   return <div className="blocked-list-content">
-    <p>解除后可再次相遇，对方也屏蔽了你时除外。</p>
+    <p>解除后可能再次遇到 TA</p>
     <button type="button" className="listener-block-trigger" disabled={busy} onClick={() => void refresh()}>刷新列表</button>
     {entries?.map(entry => <div className="blocked-list-row" key={entry.id}><span>{entry.alias}<small>{new Date(entry.createdAt).toLocaleDateString("zh-CN")}</small></span><button type="button" disabled={busy} aria-label={`解除屏蔽${entry.alias}`} onClick={() => void unblock(entry.id)}>解除屏蔽</button></div>)}
-    {!error && <p role="status">{entries === null ? "正在读取…" : !entries.length ? "还没有屏蔽的听众。" : null}</p>}
+    {!error && <p role="status">{entries === null ? "正在读取…" : !entries.length ? "还没有屏蔽任何人" : null}</p>}
     {notice && <p role="status">{notice}</p>}
     {error && <p className="listener-safety-error" role="alert">{error}</p>}
   </div>;

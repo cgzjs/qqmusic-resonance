@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AudioTrack, PlaybackStatus } from "@/lib/resonance/types";
-const sourceErrors: Record<string, string> = { PLAYLIST_STALE: "音频文件与歌单不一致，请重新准备歌单并刷新页面。", AUDIO_TOO_LARGE: "这首音频超过 32 MiB，请使用更小的文件。", TRACK_REMOVED: "这首歌已从歌单移除。" };
+const sourceErrors: Record<string, string> = { PLAYLIST_STALE: "音频与歌单不符，请刷新页面", AUDIO_TOO_LARGE: "文件太大，暂时放不了", TRACK_REMOVED: "这首歌已从歌单移除。" };
 
 export function useResonancePlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -38,7 +38,7 @@ export function useResonancePlayer() {
     const pause = () => { if (trackRef.current && !audio.ended && !audio.error) setStatus("paused"); };
     const waiting = () => { if (!audio.paused) setStatus("loading"); };
     const ended = () => { setWantsPlayback(false); setStatus("ended"); time(); };
-    const failed = () => { if (audio.error) { setWantsPlayback(false); setStatus("error"); setError("音频加载失败，请重试。"); } };
+    const failed = () => { if (audio.error) { setWantsPlayback(false); setStatus("error"); setError("加载失败，请重试"); } };
     const events = { loadedmetadata: metadata, durationchange: metadata, timeupdate: time, playing, pause, waiting, ended, error: failed };
     Object.entries(events).forEach(([name, callback]) => audio.addEventListener(name, callback));
     return () => {
@@ -87,7 +87,7 @@ export function useResonancePlayer() {
       } catch (cause) {
         if (loadController.current === controller && (!controller.signal.aborted || timedOut)) {
           loadRef.current = null; setWantsPlayback(false); setStatus("error");
-          setError(timedOut ? "音频加载超时，请重试。" : cause instanceof Error && sourceErrors[cause.message] ? sourceErrors[cause.message] : "音频加载失败，请重试。");
+          setError(timedOut ? "加载超时，请重试" : cause instanceof Error && sourceErrors[cause.message] ? sourceErrors[cause.message] : "加载失败，请重试");
         }
         throw cause;
       } finally { clearTimeout(timer); }
@@ -122,7 +122,7 @@ export function useResonancePlayer() {
       const blocked = cause instanceof DOMException && cause.name === "NotAllowedError";
       setWantsPlayback(false);
       setStatus("error");
-      setError(blocked ? "浏览器未允许播放，请再点一次播放。" : cause instanceof Error && sourceErrors[cause.message] ? sourceErrors[cause.message] : "暂时无法播放这首歌，请检查格式后重试。");
+      setError(blocked ? "再点一下播放" : cause instanceof Error && sourceErrors[cause.message] ? sourceErrors[cause.message] : "暂时放不了，换一首试试");
       return false;
     }
   }, [loadTrack]);
