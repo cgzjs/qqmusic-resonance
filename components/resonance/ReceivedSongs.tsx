@@ -6,7 +6,7 @@ import type { ReceivedSong } from "@/lib/resonance/received-songs";
 import type { AudioTrack } from "@/lib/resonance/types";
 import { AlbumTile } from "./AlbumTile";
 
-type Props = { items: ReceivedSong[]; onRead: (id: string) => Promise<boolean>; onPlay: (track: AudioTrack) => void };
+type Props = { items: ReceivedSong[]; onRead: (id: string) => Promise<boolean>; onPlay: (track: AudioTrack) => void; initialLimit?: number };
 
 /** 今天 / 昨天 / 9月28日（跨年时带年份），足迹和收到的歌共用。 */
 export function dayLabel(date: Date, today = new Date()) {
@@ -18,11 +18,11 @@ export function dayLabel(date: Date, today = new Date()) {
 export const clockTime = (date: Date) => date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 /** TA 送来的歌；旧版交换里自己送出的那首作为角标压在封面一角。 */
-export function ReceivedSongs({ items, onRead, onPlay }: Props) {
+export function ReceivedSongs({ items, onRead, onPlay, initialLimit = 20 }: Props) {
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
-  const [limit, setLimit] = useState(20);
+  const [limit, setLimit] = useState(initialLimit);
   async function markRead(item: ReceivedSong) {
     if (!item.unread || savingId) return;
     setSavingId(item.id); setErrorId(null);

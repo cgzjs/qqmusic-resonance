@@ -251,13 +251,18 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-stats [data-zero="true"] strong { color: var(--cover-ink-3); }
 
 /* 分段切换：和顶部下划线导航区分开，滚动时吸顶 */
-.tp-segments { position: sticky; top: 8px; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: 16px; padding: 3px; border-radius: 999px; background: var(--cover-glass); box-shadow: inset 0 0 0 1px var(--cover-line); -webkit-backdrop-filter: blur(24px) saturate(1.2); backdrop-filter: blur(24px) saturate(1.2); }
+.tp-segments { position: sticky; top: 8px; z-index: 5; display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; margin-top: 16px; padding: 3px; border-radius: 999px; background: var(--cover-glass); box-shadow: inset 0 0 0 1px var(--cover-line); -webkit-backdrop-filter: blur(24px) saturate(1.2); backdrop-filter: blur(24px) saturate(1.2); }
 .tp-segments button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 40px; padding: 0 6px; border: 0; border-radius: 999px; background: none; color: var(--cover-ink-2); font-size: 13px; white-space: nowrap; cursor: pointer; transition: background-color .2s, color .2s; }
 .tp-segments button:hover { color: var(--cover-ink); }
 .tp-segments button[aria-pressed="true"] { background: color-mix(in srgb, var(--cover-ink) 14%, transparent); color: var(--cover-ink); font-weight: 600; }
 .tp-segments small { color: var(--cover-ink-3); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .tp-badge { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--cover-accent); color: var(--cover-base); font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
 .tp-journey-body { margin-top: 4px; }
+.tp-journey-section + .tp-journey-section { margin-top: 28px; }
+.tp-section-head { display: flex; align-items: center; gap: 6px; margin: 20px 0 4px; color: var(--cover-ink); font-size: 15px; font-weight: 600; }
+.tp-section-head svg { color: var(--cover-ink-3); }
+.tp-section-head small { margin-left: auto; color: var(--cover-ink-2); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.tp-section-empty { margin: 8px 0 0; color: var(--cover-ink-2); font-size: 13px; }
 .tp-day { margin: 20px 0 8px; color: var(--cover-ink-2); font-size: 13px; font-weight: 600; }
 .tp-journey-body .tp-day:first-child, .tp-journey-body > * > .tp-day:first-child { margin-top: 14px; }
 

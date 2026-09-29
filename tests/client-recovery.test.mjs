@@ -381,9 +381,24 @@ test("journey exchange total matches its deduplicated mixed-source history", asy
     onlineExchanges: [online, online, { ...online, roomId: "second" }],
     onPlayTrack() {}, onRemoveFavorite() {}, onRemoveLater() {},
   })));
-  const total = [...document.querySelectorAll('.stat-grid article')].find(item => item.textContent.includes('今日交换'));
+  const total = [...document.querySelectorAll('.stat-grid article')].find(item => item.textContent.includes('今日送歌'));
   assert.equal(total.querySelector('strong').textContent, '3');
   assert.equal(document.querySelectorAll('.journey-event').length, 3);
+});
+
+test("journey has two tabs: gifts sit above the timeline, favorites and later share one tab", async () => {
+  const received = [0, 1, 2, 3].map(index => ({ id: `online:room:${index}`, receivedTrackId: audioTracks[index % audioTracks.length].id, receivedAt: Date.now() - index, unread: index === 0 }));
+  await act(async () => root.render(React.createElement(JourneySummary, {
+    library: { version: 1, favoriteIds: [audioTracks[0].id], listenLaterIds: [], events: [] },
+    received, onPlayTrack() {}, onRemoveFavorite() {}, onRemoveLater() {},
+  })));
+  const segments = [...document.querySelectorAll('.tp-segments button')];
+  assert.deepEqual(segments.map(item => item.getAttribute('aria-label')), ['足迹，1 首送你的歌未读', '收藏与待听 1']);
+  assert.equal(document.querySelectorAll('.tp-letter').length, 3);
+  assert.match(document.body.textContent, /TA 送你的/);
+  await act(async () => segments[1].click());
+  assert.equal(document.querySelectorAll('.tp-wall li').length, 1);
+  assert.match(document.body.textContent, /待听/); assert.match(document.body.textContent, /稍后再听/);
 });
 
 test("followed listener is told once who joined; the follower gets no toast", async () => {

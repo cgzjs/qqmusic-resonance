@@ -44,14 +44,14 @@ export function ResonanceExperience(props: ExperienceProps) {
   return playableListeners.length ? <PopulatedExperience {...props} /> : <EmptyPlaylistExperience />;
 }
 function EmptyPlaylistExperience() {
-  const { library, dispatch, onlineHistory, onlineExchanges, received, markExchangeRead, unreadCount } = useAccountLibrary();
+  const { library, dispatch, onlineHistory, onlineExchanges, received, markExchangeRead } = useAccountLibrary();
   const notices = useRef(new Set<string>());
   useEffect(() => () => { for (const id of notices.current) toast.dismiss(id); }, []);
   useDemoReplies(reply => {
     const id = `demo-reply-${reply.id}`; notices.current.add(id);
     toast(reply.kind === "exchange" ? "TA 回了你一首歌" : "TA 回应了你", { id, description: reply.kind === "exchange" ? "交换记录已留在收到的歌里" : "来自刚才那首歌的相遇" });
   });
-  return <section className="empty-playlist"><h2>歌单还没有歌曲</h2><p>添加歌曲后即可开始，收藏和足迹仍在</p><JourneySummary initialTab={unreadCount ? "received" : "history"} received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><MockHostPanel /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
+  return <section className="empty-playlist"><h2>歌单还没有歌曲</h2><p>添加歌曲后即可开始，收藏和足迹仍在</p><JourneySummary received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><MockHostPanel /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
 }
 function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePanel, onlineActive, onPauseOnline, initialSource }: ExperienceProps) {
   const { library, dispatch, onlineHistory, onlineExchanges, received, markExchangeRead, unreadCount, queueExchange, demoReplies } = useAccountLibrary();
@@ -86,7 +86,7 @@ function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePa
         id, description: track ? `《${track.track}》` : "可以在收到的歌里查看", icon: <InteractionGlyph kind="exchange" />,
         action: { label: "查看回歌", onClick: () => {
           void markExchangeRead(`demo:${reply.id}`);
-          setJourneyTab("received"); setView(restored && (!latestExchange.current || latestExchange.current.id === reply.id) ? "exchange" : "journey");
+          setJourneyTab("history"); setView(restored && (!latestExchange.current || latestExchange.current.id === reply.id) ? "exchange" : "journey");
         } },
         onDismiss: () => replyToasts.current.delete(id), onAutoClose: () => replyToasts.current.delete(id),
       });
@@ -207,7 +207,7 @@ function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePa
     <section className="integrated-experience">
       <audio ref={audioRef} preload="metadata" hidden />
       <section className="phone-stage" aria-label="同频音乐体验">
-        {showNavigation && <nav className="bottom-nav" aria-label="主要导航"><button type="button" data-active={view === "radar"} aria-current={view === "radar" ? "page" : undefined} onClick={() => setView("radar")}><Compass aria-hidden="true" /><span>附近</span></button><button type="button" data-active={view === "journey"} aria-current={view === "journey" ? "page" : undefined} aria-label={unreadCount ? `足迹与收藏，${unreadCount} 首回歌未读` : "足迹与收藏"} onClick={() => { setJourneyTab(unreadCount ? "received" : "history"); setView("journey"); }}><Footprints aria-hidden="true" /><span>足迹与收藏{unreadCount > 0 && <b className="unread-count" aria-hidden="true">{unreadCount}</b>}</span></button></nav>}
+        {showNavigation && <nav className="bottom-nav" aria-label="主要导航"><button type="button" data-active={view === "radar"} aria-current={view === "radar" ? "page" : undefined} onClick={() => setView("radar")}><Compass aria-hidden="true" /><span>附近</span></button><button type="button" data-active={view === "journey"} aria-current={view === "journey" ? "page" : undefined} aria-label={unreadCount ? `足迹与收藏，${unreadCount} 首送你的歌未读` : "足迹与收藏"} onClick={() => { setJourneyTab("history"); setView("journey"); }}><Footprints aria-hidden="true" /><span>足迹与收藏{unreadCount > 0 && <b className="unread-count" aria-hidden="true">{unreadCount}</b>}</span></button></nav>}
         {!inRoom && onlineActive && !(view === "radar" && radarSource === "online") && <div className="integrated-presence"><span>你正对附近可见</span><button type="button" onClick={onPauseOnline}>隐身</button></div>}
         {!inRoom && exchange && exchange.status !== "choosing" && view !== "exchange" && <button type="button" className="demo-reply-reminder" onClick={viewExchange}><InteractionGlyph kind="exchange" /><span>{exchange.status === "sending" ? "等待 TA 回歌" : "TA 回了一首歌"}</span><span>查看 →</span></button>}
         <div className="phone-stage__content" ref={contentRef}>
