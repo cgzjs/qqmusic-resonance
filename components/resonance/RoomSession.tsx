@@ -43,6 +43,19 @@ export function RoomSession({ roomId, player, onExit, onTrack, variant, headerEx
   const recorded = useRef(new Set<string>());
   // StrictMode 下卸载会断开连接，重新挂载时要能再次加入，所以不做“只加入一次”的保护。
   useEffect(() => { join(); }, [join]);
+  // 被人跟听时，新房间从 0 秒暂停开始；房主接着刚才的进度继续放，TA 跟上。
+  const [resumeFrom] = useState(() => ({ trackId: player.track?.id, position: player.currentTime, playing: player.wantsPlayback }));
+  const resumeStep = useRef<"idle" | "seeking" | "done">("idle");
+  const { command } = roomConnection;
+  useEffect(() => {
+    if (resumeStep.current === "done" || !room || !connected || !role) return;
+    if (role === "host" && room.revision === 0 && resumeFrom.trackId === room.playback.trackId && resumeFrom.position > 1) {
+      if (resumeStep.current === "idle") { resumeStep.current = "seeking"; command("seek", { position: resumeFrom.position }); }
+      return;
+    }
+    resumeStep.current = "done";
+    if (role === "host" && resumeFrom.playing && !room.playback.playing) command("play");
+  }, [room, connected, role, command, resumeFrom]);
   const trackId = room?.playback.trackId;
   useEffect(() => { if (trackId) onTrack?.(trackId); }, [trackId, onTrack]);
   useEffect(() => {

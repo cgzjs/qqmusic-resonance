@@ -14,7 +14,7 @@ const folder = path.resolve("node_modules/.cache/client-recovery");
 await mkdir(folder, { recursive: true });
 const bundle = path.join(folder, `client-recovery-${process.pid}.mjs`);
 const result = await build({
-  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useIncomingInviteNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { RoomSession } from './components/resonance/RoomSession'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
+  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useFollowerNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { RoomSession } from './components/resonance/RoomSession'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
   bundle: true, platform: "node", format: "esm", packages: "external", write: false,
   plugins: [{ name: "test-boundaries", setup(builder) {
     builder.onResolve({ filter: /^(sonner|@\/components\/ui\/sonner)$/ }, args => ({ path: args.path, namespace: "toast" }));
@@ -26,7 +26,7 @@ const result = await build({
   } }],
 });
 await writeFile(bundle, result.outputFiles[0].text);
-const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useIncomingInviteNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, RoomSession, audioTracks } = await import(pathToFileURL(bundle));
+const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useFollowerNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, RoomSession, audioTracks } = await import(pathToFileURL(bundle));
 after(() => unlink(bundle));
 const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const token = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -44,8 +44,8 @@ class Socket {
 }
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 const room = (extra = {}) => ({ id, revision: 1, expiresAt: Date.now() + 100000, closed: false, hostConnected: true, guestConnected: true, playback: { trackId: audioTracks[0].id, position: 2, playing: true, updatedAt: Date.now() }, ...extra });
-const nearby = (extra = {}) => ({ self: { id, alias: "听众 A", trackId: audioTracks[0].id }, peers: [], invite: null, ticket: null, serverTime: Date.now(), ...extra });
-const pendingInvite = () => ({ id: token, from: token, to: id, fromAlias: "听众 B", toAlias: "听众 A", trackId: audioTracks[0].id, status: "pending", expiresAt: Date.now() + 45000 });
+const nearby = (extra = {}) => ({ self: { id, alias: "听众 A", trackId: audioTracks[0].id }, peers: [], ticket: null, serverTime: Date.now(), ...extra });
+const peerB = () => ({ id: token, alias: "听众 B", trackId: audioTracks[1].id });
 const flush = () => act(async () => {});
 beforeEach(() => {
   dom = new JSDOM('<div id="app"></div>', { url: `http://localhost/room/${id}`, pretendToBeVisual: true });
@@ -156,17 +156,16 @@ test("expired room clears unresolved exchange and does not resurrect on pageshow
   assert.equal(calls.length, count);
 });
 
-test("invitation clock advances offline, disables acceptance and does not auto-start expired presence", async t => {
+test("follow is disabled offline, never sent while offline, and does not auto-start expired presence", async t => {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
-  respond = async () => response({ ...nearby({ invite: pendingInvite() }), token });
+  respond = async () => response({ ...nearby({ peers: [peerB()] }), token });
   await mount("nearby"); await act(async () => current.request("start", { trackId: audioTracks[0].id }));
-  const accept = () => [...document.querySelectorAll("button")].find(button => button.textContent.includes("接受，一起听"));
-  assert.equal(accept().disabled, false);
-  await network(false); assert.equal(accept().disabled, true);
-  await act(async () => t.mock.timers.tick(46000));
-  assert.match(document.body.textContent, /邀请已到期/);
+  const follow = () => [...document.querySelectorAll("button")].find(button => button.textContent.includes("跟 TA 一起听"));
+  assert.equal(follow().disabled, false);
+  await network(false); assert.equal(follow().disabled, true);
+  await act(async () => t.mock.timers.tick(9000));
   const count = calls.length;
-  await act(async () => current.request("respond", { inviteId: token, decision: "accept" }));
+  await act(async () => current.request("follow", { targetId: token }));
   assert.equal(calls.length, count);
   respond = async () => response({ error: "SESSION_EXPIRED" }, 401);
   await network(true);
@@ -174,17 +173,31 @@ test("invitation clock advances offline, disables acceptance and does not auto-s
   assert.equal(calls.filter(item => item.url?.endsWith("start")).length, 1);
 });
 
-test("a queued invitation is discarded after offline; late poll cannot restore readiness", async t => {
+test("tapping follow enters the room at once without any invitation step", async () => {
+  respond = async () => response({ ...nearby({ peers: [peerB()] }), token });
+  await mount("nearby"); await act(async () => current.request("start", { trackId: audioTracks[0].id }));
+  assert.equal(document.body.textContent.includes("邀请"), false);
+  const ticket = { roomId: id, token, role: "guest", peerAlias: "听众 B" };
+  respond = async url => response(url.includes("stop") ? {} : nearby({ ticket }));
+  const follow = [...document.querySelectorAll("button")].find(button => button.textContent.includes("跟 TA 一起听"));
+  await act(async () => follow.click()); await flush();
+  const sent = calls.find(item => item.url?.endsWith("/follow"));
+  assert.deepEqual(JSON.parse(sent.options.body), { targetId: token });
+  assert.equal(current.room, id); assert.deepEqual(current.joined, ticket);
+  assert.equal(calls.filter(item => item.url?.endsWith("stop")).length, 1);
+});
+
+test("a queued follow is discarded after offline; late poll cannot restore readiness", async t => {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
   await mount("nearby"); await act(async () => current.request("start", {}));
   let complete;
   respond = () => new Promise(resolve => { complete = resolve; });
-  let polling, inviting;
-  await act(async () => { polling = current.request("state"); inviting = current.request("invite", { targetId: token }); });
+  let polling, following;
+  await act(async () => { polling = current.request("state"); following = current.request("follow", { targetId: token }); });
   await network(false);
-  await act(async () => { complete(response(nearby())); await polling; t.mock.timers.tick(50); await inviting; });
+  await act(async () => { complete(response(nearby())); await polling; t.mock.timers.tick(50); await following; });
   assert.equal(current.ready, false);
-  assert.equal(calls.some(item => item.url?.endsWith("invite")), false);
+  assert.equal(calls.some(item => item.url?.endsWith("follow")), false);
 });
 
 test("late successful start after pagehide is stopped, never shown or entered", async () => {
@@ -227,6 +240,22 @@ test("inline room joins on mount without a confirm screen and exits without navi
   assert.ok(calls.some(item => item.stop));
   assert.equal(calls.some(item => item.route), false);
   assert.equal(sockets[0].sent.at(-1).type, "leave");
+});
+
+test("followed host carries on from the same spot: seek, then play once the room has it", async () => {
+  recoveryTest.host = { session: recoveryTest.session, save: async () => true, dataError: null };
+  Object.assign(player, { status: "playing", wantsPlayback: true, currentTime: 30, volume: 1, error: null, stop() {}, changeVolume() {} });
+  await act(async () => root.render(React.createElement(RoomSession, { roomId: id, player, variant: "inline", onExit() {} })));
+  await flush();
+  const socket = sockets.at(-1);
+  const fresh = { revision: 0, playback: { trackId: audioTracks[0].id, position: 0, playing: false, updatedAt: Date.now() } };
+  await act(async () => { socket.open(); socket.message({ type: "welcome", role: "host", room: room(fresh), serverTime: Date.now() }); });
+  const commands = () => socket.sent.filter(item => item.type === "command");
+  assert.deepEqual(commands().map(item => [item.action, item.position, item.revision]), [["seek", 30, 0]]);
+  await act(async () => socket.message({ type: "state", room: room({ revision: 1, playback: { ...fresh.playback, position: 30 } }), serverTime: Date.now() }));
+  assert.deepEqual(commands().map(item => item.action), ["seek", "play"]);
+  await act(async () => socket.message({ type: "state", room: room({ revision: 2, playback: { ...fresh.playback, position: 30, playing: true } }), serverTime: Date.now() }));
+  assert.equal(commands().length, 2);
 });
 
 test("pause discovery while offline stays paused after reconnection", async () => {
@@ -298,7 +327,7 @@ test("exchange replies while browsing, saves once and its notification opens the
     },
     claimReply: async id => { const item = recoveryTest.host.data.demoReplies.find(item => item.id === id); if (item.notified) return null; item.notified = true; return { ...item }; },
   };
-  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineNotice: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
+  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
   const click = async label => {
     const button = [...document.querySelectorAll("button")].find(item => item.textContent.trim() === label || item.getAttribute("aria-label") === label);
     assert.ok(button, `Missing button: ${label}`);
@@ -316,7 +345,7 @@ test("exchange replies while browsing, saves once and its notification opens the
   const pendingReply = recoveryTest.host.data.demoReplies[0];
   events.push(pendingReply.event);
   recoveryTest.host.data.demoReplies = [{ ...pendingReply, status: "ready" }];
-  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineNotice: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
+  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
   assert.equal(events.filter(event => event.type === "exchange").length, 1);
   assert.equal(recoveryTest.toasts.length, 1);
   assert.equal(recoveryTest.toasts[0].title, "TA 回了你一首歌");
@@ -357,17 +386,15 @@ test("journey exchange total matches its deduplicated mixed-source history", asy
   assert.equal(document.querySelectorAll('.journey-event').length, 3);
 });
 
-test("incoming invitation notifies once, opens invitation and disappears when resolved", async () => {
-  let opened = 0;
-  function Harness({ invite }) { useIncomingInviteNotification(invite, () => opened++); return null; }
-  const invite = pendingInvite();
-  await act(async () => root.render(React.createElement(Harness, { invite })));
-  await act(async () => root.render(React.createElement(Harness, { invite: { ...invite } })));
+test("followed listener is told once who joined; the follower gets no toast", async () => {
+  function Harness({ ticket }) { useFollowerNotification(ticket); return null; }
+  const ticket = { roomId: id, token, role: "host", peerAlias: "听众 B" };
+  await act(async () => root.render(React.createElement(Harness, { ticket })));
+  await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket } })));
   assert.equal(recoveryTest.toasts.length, 1);
-  assert.equal(recoveryTest.toasts[0].title, "有人邀请你一起听");
-  recoveryTest.toasts[0].action.onClick(); assert.equal(opened, 1);
-  await act(async () => root.render(React.createElement(Harness, { invite: null })));
-  assert.ok(recoveryTest.dismissedToasts.includes(recoveryTest.toasts[0].id));
+  assert.equal(recoveryTest.toasts[0].title, "听众 B 在跟你一起听");
+  await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket, roomId: token, role: "guest" } })));
+  assert.equal(recoveryTest.toasts.length, 1);
 });
 
 test("room recipient gets offer toast; sender does not; completion notifies without heartbeat duplicates", async () => {

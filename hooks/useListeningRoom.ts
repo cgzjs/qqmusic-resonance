@@ -9,14 +9,14 @@ import { clockOffset, isRoomSnapshot, UUID_PATTERN, type RoomCommand, type RoomR
 
 export type ConnectionState = "idle" | "connecting" | "connected" | "reconnecting" | "error" | "closed";
 const errors: Record<string, string> = {
-  INVALID_TOKEN: "链接已失效，请回附近重新邀请",
-  AUTH_REQUIRED: "验证失败，请回附近重新邀请",
+  INVALID_TOKEN: "链接已失效，请回附近再试",
+  AUTH_REQUIRED: "验证失败，请回附近再试",
   AUTH_TIMEOUT: "连接超时，请重试",
   ROOM_FULL: "房间已满，刚掉线的话稍等再进",
   ROOM_CLOSED: "一起听已结束",
   ROOM_NOT_FOUND: "房间已关闭",
   REPLACED: "已在另一个页面进入房间",
-  HOST_ONLY: "播放由分享歌曲的一方控制。",
+  HOST_ONLY: "播放由 TA 控制",
   STALE_REVISION: "房间有变化，请重新操作",
   RATE_LIMIT: "太快啦，稍等再试",
   TRACK_UNAVAILABLE: "这首歌已下架，换一首吧",
@@ -132,7 +132,7 @@ export function useListeningRoom(roomId: string) {
           if (message.type === "exchange-result" && message.requestId === exchangeCommandRef.current?.id) {
             if (exchangeTimer.current) clearTimeout(exchangeTimer.current);
             exchangeTimer.current = null; exchangeCommandRef.current = null; setExchangeRequest("idle");
-            const reasons: Record<string, string> = { EXCHANGE_BUSY: "TA 已送来一首，先回应吧", EXCHANGE_STALE: "操作已过期，请重试", EXCHANGE_FINISHED: "交换已结束", EXCHANGE_FORBIDDEN: "等 TA 回应，或撤回这首", EXCHANGE_INVALID_REPLY: "换一首不一样的歌", EXCHANGE_CONFLICT: "操作失败，请重试", EXCHANGE_LIMIT: "交换次数已用完，或上次还在保存", PEER_OFFLINE: "TA 暂时掉线了", EXCHANGE_ACCOUNT_REQUIRED: "请先从附近邀请 TA 一起听", INVALID_TRACK: "这首歌暂不可交换。", RATE_LIMIT: "太快啦，稍等再试" };
+            const reasons: Record<string, string> = { EXCHANGE_BUSY: "TA 已送来一首，先回应吧", EXCHANGE_STALE: "操作已过期，请重试", EXCHANGE_FINISHED: "交换已结束", EXCHANGE_FORBIDDEN: "等 TA 回应，或撤回这首", EXCHANGE_INVALID_REPLY: "换一首不一样的歌", EXCHANGE_CONFLICT: "操作失败，请重试", EXCHANGE_LIMIT: "交换次数已用完，或上次还在保存", PEER_OFFLINE: "TA 暂时掉线了", EXCHANGE_ACCOUNT_REQUIRED: "请先从附近跟 TA 一起听", INVALID_TRACK: "这首歌暂不可交换。", RATE_LIMIT: "太快啦，稍等再试" };
             setExchangeError(message.error ? reasons[message.error] ?? "交换失败，请重试" : null);
           }
           if (message.type === "reaction-status" && message.id === outgoingRef.current?.id && ["sent", "received", "failed"].includes(message.status)) {
@@ -197,7 +197,7 @@ export function useListeningRoom(roomId: string) {
           if ([4001, 4003, 4004, 4005].includes(event.code)) {
             leavingRef.current = true;
             setConnection(event.code === 4004 ? "closed" : "error");
-            setError(errors[event.reason] ?? "加入失败，请回附近重新邀请");
+            setError(errors[event.reason] ?? "加入失败，请回附近再试");
             return;
           }
           retry();

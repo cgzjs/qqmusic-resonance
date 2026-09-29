@@ -1,16 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { NearbySnapshot } from "@/lib/resonance/nearby-protocol";
+import type { NearbySnapshot, SessionTicket } from "@/lib/resonance/nearby-protocol";
 import { accountHeaders, type HostSession } from "@/lib/resonance/host-protocol";
 import { demoHost } from "@/lib/resonance/demo-host";
 
 const messages: Record<string, string> = {
   AUTH_EXPIRED: "登录已过期，请重新登录。", ALREADY_DISCOVERING: "已在另一个页面打开，请先关掉那边",
   SESSION_EXPIRED: "连接超时，已自动隐身", UNAVAILABLE: "TA 已离开",
-  BUSY: "还有未处理的邀请，稍后再试", COOLDOWN: "刚邀请过，一分钟后再试",
-  INVITE_EXPIRED: "邀请已失效", AREA_FULL: "附近人太多，稍后再试",
-  FORBIDDEN: "你不能处理这个邀请。",
+  BUSY: "TA 正在和别人一起听", COOLDOWN: "太快啦，稍等再试",
+  AREA_FULL: "附近人太多，稍后再试", CONNECT_FAILED: "没连上，请重试",
 };
 
 const subscribeNetwork = (notify: () => void) => {
@@ -30,6 +29,8 @@ const readActiveRoom = (accountId: string) => {
 export function useNearby(session: HostSession) {
   // 一起听在附近页原地进行；刷新后从会话存储恢复同一个房间。
   const [room, setRoom] = useState<string | null>(() => readActiveRoom(session.accountId));
+  // 本次跟听的凭据（刷新恢复时没有，只用于提醒被跟的一方）。
+  const [joined, setJoined] = useState<SessionTicket | null>(null);
   const [snapshot, setSnapshot] = useState<NearbySnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export function useNearby(session: HostSession) {
     const token = tokenRef.current;
     epoch.current++; tokenRef.current = null; readyRef.current = false;
     if (token) void fetch("/api/nearby/stop", { method: "POST", headers: { "Content-Type": "application/json", ...accountHeaders(session), Authorization: `Bearer ${token}` }, body: "{}", keepalive: true }).catch(() => {});
-    setSnapshot(null); setReady(false); setError(null); setRoom(next.ticket.roomId);
+    setSnapshot(null); setReady(false); setError(null); setJoined(next.ticket); setRoom(next.ticket.roomId);
     return true;
   }, [session]);
 
@@ -69,7 +70,7 @@ export function useNearby(session: HostSession) {
       if (active) sessionStorage.removeItem(prefix + active);
       sessionStorage.removeItem(`${prefix}active`);
     } catch { /* 内存状态照样退出。 */ }
-    enteringRef.current = false; setRoom(null);
+    enteringRef.current = false; setJoined(null); setRoom(null);
   }, [session.accountId]);
 
   const request = useCallback(async function perform(action: string, body?: object) {
@@ -93,7 +94,7 @@ export function useNearby(session: HostSession) {
       finally { queued.current = false; }
     }
     if (!mountedRef.current || startedEpoch !== epoch.current || !navigator.onLine) return;
-    if (["invite", "respond", "track"].includes(action) && (!readyRef.current || Date.now() - confirmedAt.current > 8000)) return;
+    if (["follow", "track"].includes(action) && (!readyRef.current || Date.now() - confirmedAt.current > 8000)) return;
     pendingRef.current = true;
     if (action !== "state") setBusy(true);
     const controller = new AbortController();
@@ -168,5 +169,5 @@ export function useNearby(session: HostSession) {
       document.removeEventListener("visibilitychange", restore);
     };
   }, [request, session]);
-  return { snapshot, busy, error, ready, online, now, room, request, leaveSession };
+  return { snapshot, busy, error, ready, online, now, room, joined, request, leaveSession };
 }

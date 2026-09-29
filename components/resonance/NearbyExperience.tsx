@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Radio } from "lucide-react";
 import { audioTracks } from "@/lib/resonance/demo-data";
 import { useNearby } from "@/hooks/useNearby";
+import { useFollowerNotification } from "@/hooks/useOnlineNotifications";
 import { useHost } from "./HostProvider";
 import { HostStatus, MockHostPanel, AccountControls } from "./HostStatus";
 import type { HostSession } from "@/lib/resonance/host-protocol";
@@ -31,7 +32,7 @@ export function NearbyExperience({ initialSource = "online" }: { initialSource?:
 function ConnectedNearby({ session, initialSource }: { session: HostSession; initialSource: "demo" | "online" }) {
   const host = useHost();
   const nearby = useNearby(session);
-  const { snapshot, request, busy, ready, room, leaveSession } = nearby;
+  const { snapshot, request, busy, ready, room, joined, leaveSession } = nearby;
   const track = audioTracks.find(track => track.id === host.trackId);
   useEffect(() => {
     if (!ready || !snapshot || snapshot.ticket || snapshot.self.trackId === track?.id) return;
@@ -43,10 +44,9 @@ function ConnectedNearby({ session, initialSource }: { session: HostSession; ini
     leaveSession();
     if (trackId) void request("start", { trackId });
   }, [leaveSession, request, trackId]);
-  const invite = snapshot?.invite;
-  const notice = invite?.status === "pending" ? invite.to === snapshot?.self.id ? "有人邀请你一起听" : "邀请已发出，等 TA 回应" : null;
+  useFollowerNotification(joined);
   return <>
     {host.dataError && <div className="room-error integrated-error" role="alert">{host.dataError}<button className="room-secondary" onClick={host.refreshData}>重新加载</button></div>}
-    {host.dataLoading ? <p className="plugin-host-status" role="status">正在加载你的足迹…</p> : <ResonanceExperience roomView={room ? player => <RoomSession key={room} variant="inline" roomId={room} player={player} onExit={exitRoom} onTrack={demoHost.setTrack} /> : null} playbackHeader={room ? undefined : player => <CurrentPlaybackBar player={player} />} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineNotice={notice} incomingInvite={invite?.status === "pending" && invite.to === snapshot?.self.id ? invite : null} onlineActive={!!snapshot && !snapshot.ticket} onPauseOnline={() => { if (!busy) void request("stop", {}); }} />}
+    {host.dataLoading ? <p className="plugin-host-status" role="status">正在加载你的足迹…</p> : <ResonanceExperience roomView={room ? player => <RoomSession key={room} variant="inline" roomId={room} player={player} onExit={exitRoom} onTrack={demoHost.setTrack} /> : null} playbackHeader={room ? undefined : player => <CurrentPlaybackBar player={player} />} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineActive={!!snapshot && !snapshot.ticket} onPauseOnline={() => { if (!busy) void request("stop", {}); }} />}
   </>;
 }

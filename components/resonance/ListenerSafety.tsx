@@ -19,7 +19,7 @@ export function BlockListenerButton({ target, alias, disabled, onBlocked }: Bloc
   }
   return <div className="listener-safety">
     {done ? <p role="status">已屏蔽，可在设置里解除</p> : confirming ? <div className="listener-block-confirm" role="group" aria-label={`屏蔽${alias}`}>
-      <p>屏蔽后互相看不到，也无法邀请。{"roomId" in target ? "一起听会结束。" : "邀请会取消。"}</p>
+      <p>屏蔽后互相看不到，也不能一起听。{"roomId" in target ? "这次一起听会结束。" : ""}</p>
       <div><button type="button" className="room-secondary" disabled={busy} onClick={() => setConfirming(false)}>取消</button><button type="button" className="room-secondary" disabled={busy || disabled} onClick={() => void block()}>{busy ? "正在屏蔽…" : "确认屏蔽"}</button></div>
     </div> : <button type="button" className="listener-block-trigger" disabled={disabled} aria-label={`屏蔽${alias}`} onClick={() => setConfirming(true)}><Ban size={14} aria-hidden="true" />屏蔽</button>}
     {error && <p className="listener-safety-error" role="alert">{error}</p>}

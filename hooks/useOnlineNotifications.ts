@@ -2,20 +2,15 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { audioTracks } from "@/lib/resonance/demo-data";
-import type { NearbyInvite } from "@/lib/resonance/nearby-protocol";
+import type { SessionTicket } from "@/lib/resonance/nearby-protocol";
 import type { RoomRole, RoomSnapshot } from "@/lib/resonance/room-protocol";
 
-export function useIncomingInviteNotification(invite: NearbyInvite | null | undefined, onOpen: () => void) {
-  const open = useRef(onOpen);
-  useEffect(() => { open.current = onOpen; }, [onOpen]);
-  const id = invite?.id, trackId = invite?.trackId;
+// 免邀请：有人跟你一起听时只提醒一次，不需要你处理。
+export function useFollowerNotification(ticket: SessionTicket | null) {
+  const roomId = ticket?.role === "host" ? ticket.roomId : null, alias = ticket?.peerAlias;
   useEffect(() => {
-    if (!id) return;
-    const toastId = `nearby-invite-${id}`;
-    const track = audioTracks.find(item => item.id === trackId);
-    toast("有人邀请你一起听", { id: toastId, description: track ? `《${track.track}》` : "点开看看", duration: Infinity, action: { label: "查看邀请", onClick: () => open.current() } });
-    return () => { toast.dismiss(toastId); };
-  }, [id, trackId]);
+    if (roomId) toast(`${alias} 在跟你一起听`, { id: `nearby-follower-${roomId}`, description: "你放什么，TA 就听什么", duration: 6000 });
+  }, [roomId, alias]);
 }
 
 export function useRoomExchangeNotification(room: RoomSnapshot | null, role: RoomRole | null, connected: boolean) {
