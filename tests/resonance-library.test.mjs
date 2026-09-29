@@ -35,6 +35,11 @@ test("corrupt, outdated, and invalid stored records are discarded", () => {
   assert.deepEqual(restored.listenLaterIds, ["b"]);
   assert.deepEqual(restored.events, [event]);
 });
+test("a one-way gift is kept without a reply song; a bad reply song is still rejected", () => {
+  const gift = { ...event, id: "gift-1" }; delete gift.receivedTrackId;
+  const raw = JSON.stringify({ version: 1, events: [gift, { ...event, id: "empty-reply", receivedTrackId: "" }, { ...event, id: "unknown-reply", receivedTrackId: "unknown" }] });
+  assert.deepEqual(parseLibrary(raw, tracks, listeners).events, [gift]);
+});
 test("library can round-trip through storage and removal stays separate", () => {
   let state = updateLibrary(emptyLibrary, { type: "event", event });
   state = updateLibrary(state, { type: "favorite", trackId: "b" });

@@ -37,9 +37,10 @@ export function parseLibrary(raw: string | null, trackIds: Set<string>, listener
       if (!event || typeof event !== "object" || typeof event.id !== "string" || !event.id || seen.has(event.id)) return false;
       if (!["discover", "listen", "exchange"].includes(event.type) || !trackIds.has(event.trackId) || !listenerIds.has(event.listenerId) || !scenes.has(event.scene)) return false;
       if (typeof event.createdAt !== "string" || !Number.isFinite(Date.parse(event.createdAt))) return false;
-      if (event.type === "exchange" && (!event.receivedTrackId || !trackIds.has(event.receivedTrackId) || event.receivedTrackId === event.trackId)) return false;
+      // 送 TA 一首是单向的，没有 receivedTrackId；旧版交换的回歌仍要合法。
+      if (event.type === "exchange" && event.receivedTrackId !== undefined && (!trackIds.has(event.receivedTrackId) || event.receivedTrackId === event.trackId)) return false;
       seen.add(event.id); return true;
-    }).map((event: JourneyEvent) => ({ id: event.id, type: event.type, trackId: event.trackId, listenerId: event.listenerId, scene: event.scene, createdAt: event.createdAt, ...(event.type === "exchange" ? { receivedTrackId: event.receivedTrackId } : {}) })).slice(-300) : [];
+    }).map((event: JourneyEvent) => ({ id: event.id, type: event.type, trackId: event.trackId, listenerId: event.listenerId, scene: event.scene, createdAt: event.createdAt, ...(event.type === "exchange" && event.receivedTrackId ? { receivedTrackId: event.receivedTrackId } : {}) })).slice(-300) : [];
     return { version: 1, favoriteIds, listenLaterIds: ids(parsed.listenLaterIds).filter(id => !favoriteIds.includes(id)), events };
   } catch { return emptyLibrary; }
 }

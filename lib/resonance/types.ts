@@ -1,6 +1,6 @@
 export type SceneId = "metro" | "campus" | "cafe";
 
-export type AppView = "radar" | "match" | "listening" | "exchange" | "journey";
+export type AppView = "radar" | "journey";
 
 export type SongSuggestion = {
   coverUrl?: string;
@@ -64,4 +64,3 @@ export type MusicLibrary = {
 };
 
 export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "ended" | "error";
-export type ExchangeStatus = "choosing" | "sending" | "received";

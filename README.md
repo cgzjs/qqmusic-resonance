@@ -52,14 +52,12 @@ components/
   resonance/                  业务组件
     ResonanceLanding.tsx       封面与章节切换
     ResonanceExperience.tsx    页面状态机与流程编排
-    RadarHome.tsx              音乐雷达首页
-    MusicRadar.tsx             雷达可视化
-    MatchDetail.tsx            同频匹配详情
-    ListeningSession.tsx       双人跟听
-    SongExchange.tsx           互荐歌曲
+    OnlineNearbyPanel.tsx      附近页（真实与模拟听众共用）
+    RoomStage.tsx              一起听界面（真实与模拟听众共用）
+    DemoRoomSession.tsx        和模拟听众一起听
+    RoomExchangePanel.tsx      送 TA 一首
     JourneySummary.tsx         音乐足迹
     AlbumTile.tsx              可复用唱片视觉
-    ViewHeader.tsx             二级页面标题
   ui/                         通用界面基础组件
 lib/
   resonance/

@@ -311,21 +311,21 @@ test("a late claimed reply does not notify after the account experience unmounts
   assert.equal(replies.length, 0);
 });
 
-test("exchange replies while browsing, saves once and its notification opens the result", async t => {
-  t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+test("demo listeners share the nearby and room screens; a gift is one-way and lands in the journey", async t => {
   t.mock.method(window.HTMLMediaElement.prototype, "load", () => {});
   t.mock.method(window.HTMLMediaElement.prototype, "pause", () => {});
+  t.mock.method(window.HTMLMediaElement.prototype, "play", () => Promise.resolve());
   window.HTMLElement.prototype.scrollTo = () => {};
-  const events = [];
+  const actions = [];
   recoveryTest.toasts = [];
   recoveryTest.host = {
     data: { favoriteIds: [], listenLaterIds: [], events: [], history: [], onlineExchanges: [], demoReplies: [] },
     save: async (action, trackId, id, event) => {
-      if (action === "event") events.push(event);
-      if (action === "queueExchange") recoveryTest.host.data.demoReplies = [{ id, trackId, kind: "exchange", event, dueAt: Date.now() + 2600, status: "pending", notified: false }];
+      actions.push(action);
+      if (action === "event") recoveryTest.host.data = { ...recoveryTest.host.data, events: [...recoveryTest.host.data.events, event] };
       return true;
     },
-    claimReply: async id => { const item = recoveryTest.host.data.demoReplies.find(item => item.id === id); if (item.notified) return null; item.notified = true; return { ...item }; },
+    claimReply: async () => null,
   };
   await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
   const click = async label => {
@@ -333,27 +333,26 @@ test("exchange replies while browsing, saves once and its notification opens the
     assert.ok(button, `Missing button: ${label}`);
     await act(async () => button.click());
   };
-  await click(`查看 ${audioTracks[0].track}`);
-  await click("丢一首歌给 TA");
-  await click("匿名送出这首歌");
-  await click("先去逛逛");
-  await click("足迹与收藏");
-  await act(async () => t.mock.timers.tick(2599));
+  assert.ok(document.querySelector(".tp-nearby"), "demo listeners use the same nearby radar as real ones");
+  await click("跟 TA 一起听");
+  assert.ok(document.querySelector(".tp-room-session"), "following a demo listener opens the shared room screen");
+  assert.equal(document.querySelector(".bottom-nav"), null);
+  await click("挑一首");
+  const send = [...document.querySelectorAll("button")].find(item => item.textContent.startsWith("送出《"));
+  assert.ok(send);
+  await act(async () => send.click());
+  const gifts = recoveryTest.host.data.events.filter(event => event.type === "exchange");
+  assert.equal(gifts.length, 1);
+  assert.equal(gifts[0].receivedTrackId, undefined);
+  assert.ok(!actions.includes("queueExchange"), "no reply song is queued");
+  assert.match(document.body.textContent, /已送给 TA/);
   assert.equal(recoveryTest.toasts.length, 0);
-  assert.match(document.body.textContent, /我的音乐足迹/);
-  await act(async () => t.mock.timers.tick(1));
-  const pendingReply = recoveryTest.host.data.demoReplies[0];
-  events.push(pendingReply.event);
-  recoveryTest.host.data.demoReplies = [{ ...pendingReply, status: "ready" }];
-  await act(async () => root.render(React.createElement(ResonanceExperience, { onlinePanel: null, onlineActive: false, onPauseOnline() {}, initialSource: "demo" })));
-  assert.equal(events.filter(event => event.type === "exchange").length, 1);
-  assert.equal(recoveryTest.toasts.length, 1);
-  assert.equal(recoveryTest.toasts[0].title, "TA 回了你一首歌");
-  assert.match(document.body.textContent, /我的音乐足迹/);
-  await act(async () => recoveryTest.toasts[0].action.onClick());
-  assert.match(document.body.textContent, /收到一首新音乐/);
-  await act(async () => t.mock.timers.tick(3000));
-  assert.equal(events.filter(event => event.type === "exchange").length, 1);
+  await click("结束一起听");
+  assert.ok(document.querySelector(".tp-nearby"));
+  await click("足迹与收藏");
+  assert.match(document.body.textContent, /一起听时送给 TA/);
+  const total = [...document.querySelectorAll(".stat-grid article")].find(item => item.textContent.includes("今日送歌"));
+  assert.equal(total.querySelector("strong").textContent, "1");
 });
 
 test("received list does not mark on mount; opening unavailable songs supports read failure and retry", async () => {
