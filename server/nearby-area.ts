@@ -3,11 +3,12 @@ import { audioTracks } from "../lib/resonance/demo-data";
 import { ROOM_LIFETIME_MS, UUID_PATTERN } from "../lib/resonance/room-protocol";
 import type { BlockedListener } from "../lib/resonance/nearby-protocol";
 import { PRESENCE_MS, type NearbyPeer, type NearbySnapshot, type SessionTicket } from "../lib/resonance/nearby-protocol";
+import { locationMusic } from "./location-music";
 
 type Participant = NearbyPeer & { accountId: string; sessionHash?: string; token: string; lastSeen: number; ticket: SessionTicket | null };
 const digestSession = async (token: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)))).map(byte => byte.toString(16).padStart(2, "0")).join("");
 type Block = BlockedListener & { accountId: string; sourcePeerId?: string; sourceRoomId?: string };
-type ActiveRoom = { host: string; guest: string; hostAlias: string; guestAlias: string; expiresAt: number };
+type ActiveRoom = { host: string; guest: string; hostAlias: string; guestAlias: string; expiresAt: number; acceptedAt?: number };
 type State = { people: Record<string, Participant>; blocks: Record<string, Block[]>; rooms: Record<string, ActiveRoom>; closingRooms: string[]; follows: Record<string, number> };
 
 // One explicitly labelled demonstration area. It does not infer physical proximity.
@@ -60,6 +61,7 @@ export class NearbyArea extends DurableObject<Cloudflare.Env> {
   async fetch(request: Request): Promise<Response> {
     // Serialize follow + room allocation across awaits: one listener can only be in one room.
     return this.ctx.blockConcurrencyWhile(async () => {
+      if (new URL(request.url).pathname.startsWith("/api/bottles/")) return locationMusic(request, this.ctx);
       const now = Date.now(); this.sweep(now);
       const reply = (data: object, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
       const fail = (error: string, status = 409) => reply({ error }, status);
@@ -134,7 +136,22 @@ export class NearbyArea extends DurableObject<Cloudflare.Env> {
       if (request.method !== "POST") return fail("METHOD_NOT_ALLOWED", 405);
       if (action === "accept") {
         if (!person.ticket || person.ticket.role !== "host" || person.ticket.roomId !== body.roomId) { await this.save(); return fail("UNAVAILABLE"); }
+        const active = this.state.rooms[person.ticket.roomId];
+        if (!active || active.host !== actor) return fail("UNAVAILABLE");
+        active.acceptedAt = now;
         person.lastSeen = now; await this.save(); return reply(this.snapshot(person));
+      }
+      if (action === "decline") {
+        if (!person.ticket || person.ticket.role !== "host" || person.ticket.roomId !== body.roomId) return fail("UNAVAILABLE");
+        const roomId = person.ticket.roomId, active = this.state.rooms[roomId];
+        if (!active || active.host !== actor || active.acceptedAt) return fail("UNAVAILABLE");
+        try {
+          const closed = await this.env.ROOMS.get(this.env.ROOMS.idFromName(roomId)).fetch(new Request("https://room.internal/decline", { method: "POST", body: JSON.stringify({ host: active.host, guest: active.guest }), signal: AbortSignal.timeout(4000) }));
+          if (!closed.ok) return fail(closed.status === 409 ? "UNAVAILABLE" : "CONNECT_FAILED", closed.status === 409 ? 409 : 503);
+        } catch { return fail("CONNECT_FAILED", 503); }
+        for (const peer of Object.values(this.state.people)) if (peer.ticket?.roomId === roomId) peer.ticket = null;
+        delete this.state.rooms[roomId]; person.lastSeen = now;
+        await this.save(); return reply(this.snapshot(person));
       }
       if (action === "stop") { delete this.state.people[person.id]; await this.save(); return reply({ ok: true }); }
       person.lastSeen = now;
@@ -149,7 +166,7 @@ export class NearbyArea extends DurableObject<Cloudflare.Env> {
         if (now - (this.state.follows[person.accountId] ?? 0) < NearbyArea.FOLLOW_COOLDOWN_MS) return fail("COOLDOWN", 429);
         this.state.follows[person.accountId] = now;
         const roomId = crypto.randomUUID();
-        const response = await this.env.ROOMS.get(this.env.ROOMS.idFromName(roomId)).fetch(new Request("https://room.internal/init", { method: "POST", body: JSON.stringify({ id: roomId, trackId: target.trackId, nearby: true, accounts: { host: target.accountId, guest: person.accountId } }) }));
+        const response = await this.env.ROOMS.get(this.env.ROOMS.idFromName(roomId)).fetch(new Request("https://room.internal/init", { method: "POST", body: JSON.stringify({ id: roomId, trackId: target.trackId, nearby: true, accounts: { host: target.accountId, guest: person.accountId }, ...(request.headers.get("X-Account-Scope") === "preview" ? { accountScope: "preview" } : {}) }) }));
         if (!response.ok) return fail("CONNECT_FAILED", 503);
         const room = await response.json<{ hostToken: string; guestToken: string }>();
         this.state.rooms[roomId] = { host: target.accountId, guest: person.accountId, hostAlias: target.alias, guestAlias: person.alias, expiresAt: now + ROOM_LIFETIME_MS };

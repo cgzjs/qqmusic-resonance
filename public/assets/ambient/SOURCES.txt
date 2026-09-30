@@ -21,3 +21,7 @@ Original SVG geometry retained. CSS masks apply theme color, size, rotation and
 opacity. Static decorative artwork is hidden from assistive technology and does
 not intercept pointer input. Playback effects are CSS ornament, not measured
 audio frequency data. No asset requests go to third-party servers at runtime.
+
+sound-postcard-bg.png
+AI-generated original atmospheric illustration for the Sound Postcard UI background.
+Generated with the Codex built-in image generation tool on 2026-09-30 from a project-specific prompt. No text, logos, recognizable people, or third-party artwork were used. The image is used as a low-opacity decorative layer behind the editor content.

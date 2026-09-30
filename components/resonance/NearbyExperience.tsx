@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Radio } from "lucide-react";
 import { audioTracks } from "@/lib/resonance/demo-data";
@@ -20,11 +20,19 @@ import { coverThemeStyle } from "@/lib/resonance/cover-theme";
 
 export function NearbyExperience({ initialSource = "online" }: { initialSource?: "demo" | "online" }) {
   const host = useHost();
+  const [source, setSource] = useState<"demo" | "online">(() => {
+    try { const stored = sessionStorage.getItem("resonance.experience-source"); return stored === "demo" || stored === "online" ? stored : initialSource; }
+    catch { return initialSource; }
+  });
+  const selectSource = useCallback((next: "demo" | "online") => {
+    try { sessionStorage.setItem("resonance.experience-source", next); } catch { /* 当前页面仍可体验。 */ }
+    setSource(next);
+  }, []);
   const track = audioTracks.find(item => item.id === host.trackId) ?? audioTracks[0];
   const signedIn = host.status === "ready" && !!host.session;
   return <main className="room-page nearby-page plugin-page integrated-plugin music-app cover-scope tp-app" data-authenticated={host.status === "ready"} style={coverThemeStyle(track)}><CoverBackdrop coverUrl={track?.coverUrl} /><section className="tp-shell">
     <header className="tp-top"><Link href="/" className="tp-brand"><Radio size={22} strokeWidth={1.8} aria-hidden="true" />同频</Link><div className="tp-top-actions"><AppearanceToggle compact />{signedIn && host.session ? <details className="music-account-menu tp-account"><summary aria-label={`账号：${host.session.displayName.replace(/^模拟/, "")}`}><span className="tp-avatar" aria-hidden="true">{host.session.displayName.endsWith("B") ? "B" : "A"}</span></summary><AccountControls /></details> : null}</div></header>
-    {signedIn && host.session ? <ConnectedNearby key={host.session.token} session={host.session} initialSource={initialSource} /> : <HostStatus />}
+    {signedIn && host.session ? <ConnectedNearby key={host.session.token} session={host.session} initialSource={source} /> : <HostStatus onSelectSource={selectSource} />}
     {!signedIn && <MockHostPanel />}
   </section></main>;
 }
@@ -46,11 +54,14 @@ function ConnectedNearby({ session, initialSource }: { session: HostSession; ini
   }, [leaveSession, request, trackId]);
   const invitation = snapshot?.ticket?.role === "host" ? snapshot.ticket : null;
   const acceptInvitation = useCallback(() => {
-    if (invitation && !busy) void request("accept", { roomId: invitation.roomId });
-  }, [invitation, busy, request]);
-  useFollowerNotification(invitation, acceptInvitation);
+    if (invitation && !busy && ready && nearby.online) void request("accept", { roomId: invitation.roomId });
+  }, [invitation, busy, ready, nearby.online, request]);
+  const declineInvitation = useCallback(() => {
+    if (invitation && !busy && ready && nearby.online) void request("decline", { roomId: invitation.roomId });
+  }, [invitation, busy, ready, nearby.online, request]);
+  useFollowerNotification(invitation, acceptInvitation, declineInvitation);
   return <>
     {host.dataError && <div className="room-error integrated-error" role="alert">{host.dataError}<button className="room-secondary" onClick={host.refreshData}>重新加载</button></div>}
-    {host.dataLoading ? <p className="plugin-host-status" role="status">正在加载你的足迹…</p> : <ResonanceExperience roomView={room ? player => <RoomSession key={room} variant="inline" roomId={room} peerAlias={joined?.peerAlias} player={player} onExit={exitRoom} onTrack={demoHost.setTrack} /> : null} playbackHeader={room ? undefined : player => <CurrentPlaybackBar player={player} />} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineActive={!!snapshot && !snapshot.ticket} onPauseOnline={() => { if (!busy) void request("stop", {}); }} />}
+    {host.dataLoading ? <p className="plugin-host-status" role="status">正在加载你的足迹…</p> : <ResonanceExperience roomView={room ? player => <RoomSession key={room} variant="inline" roomId={room} peerAlias={joined?.peerAlias} player={player} onExit={exitRoom} onTrack={demoHost.setTrack} /> : null} playbackHeader={room ? undefined : player => <CurrentPlaybackBar player={player} />} currentTrackId={track?.id ?? null} onTrackChange={demoHost.setTrack} initialSource={initialSource} onlinePanel={player => <OnlineNearbyPanel nearby={nearby} currentTrackId={track?.id ?? null} player={player} />} onlineActive={!!snapshot && !snapshot.ticket} modeSwitchDisabled={busy || !!snapshot?.ticket} onPauseOnline={() => void request("stop", {})} />}
   </>;
 }

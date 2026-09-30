@@ -52,6 +52,7 @@ test("inviter waits alone, host accepts explicitly, and cancelled invitations ca
     const accepted = await call("accept", b.token, { roomId: invitation.ticket.roomId });
     host = connect(accepted.ticket, b.session.token);
     await guest.wait(event => event.room?.hostConnected && event.room.guestConnected);
+    await call("decline", b.token, { roomId: followed.ticket.roomId }, 409);
     guest.socket.send(JSON.stringify({ type: "leave" }));
     await host.wait(event => event.room?.closed);
     assert.equal((await call("state", b.token)).ticket, null);
@@ -60,6 +61,26 @@ test("inviter waits alone, host accepts explicitly, and cancelled invitations ca
     guest?.socket.close(); host?.socket.close();
     await Promise.all([stop(a), stop(b)]);
   }
+});
+
+test("host decline ends the inviter's wait, keeps discovery, and rejects stale or unauthorized requests", async () => {
+  const a = await start(), b = await start(); let guest;
+  try {
+    const followed = await call('follow', a.token, { targetId: b.self.id });
+    guest = connect(followed.ticket, a.session.token);
+    await guest.wait(event => event.type === 'welcome');
+    await call('decline', a.token, { roomId: followed.ticket.roomId }, 409);
+    await call('decline', b.token, { roomId: crypto.randomUUID() }, 409);
+    const declined = await call('decline', b.token, { roomId: followed.ticket.roomId });
+    assert.equal(declined.ticket, null); assert.equal(declined.self.trackId, b.self.trackId);
+    await guest.wait(event => event.room?.closed);
+    assert.equal((await fetch(`${base}/api/rooms/${followed.ticket.roomId}/status`)).status, 404);
+    await call('decline', b.token, { roomId: followed.ticket.roomId }, 409);
+    await call('accept', b.token, { roomId: followed.ticket.roomId }, 409);
+    assert.equal((await call('state', a.token)).ticket, null);
+    assert.ok((await call('state', b.token)).peers.some(peer => peer.id === a.self.id));
+    assert.equal((await fetch(`${base}/api/rooms/${followed.ticket.roomId}/decline`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
+  } finally { guest?.socket.close(); await Promise.all([stop(a), stop(b)]); }
 });
 
 test("cancelling before the host joins removes the invitation", async () => {

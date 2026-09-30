@@ -97,3 +97,53 @@ test("follow opens a room at once: the followed listener hosts, both get tickets
   assert.equal((await blocked.json()).error, "UNAVAILABLE");
   assert.equal(inits.length, 1);
 });
+
+test("only the invited host can decline; failures preserve tickets, acknowledgement clears only that room", async () => {
+  const storage = new Map(); let available = false, closures = 0;
+  const env = { ROOMS: { idFromName: id => id, get: () => ({ fetch: async request => {
+    if (request.url.endsWith('/status')) return Response.json({ active: true });
+    if (request.url.endsWith('/init')) return Response.json({ hostToken: 'host-token', guestToken: 'guest-token' });
+    assert.ok(request.url.endsWith('/decline'));
+    assert.deepEqual(await request.json(), { host: b, guest: a });
+    closures++;
+    return Response.json({ ok: available }, { status: available ? 200 : 503 });
+  } }) } };
+  const area = new NearbyArea(context(storage), env);
+  const { tracks } = (await import('../lib/resonance/catalog.generated.json', { with: { type: 'json' } })).default;
+  const start = async account => (await area.fetch(reqAs(account, 'start', { trackId: tracks[0].id }))).json();
+  const ap = await start(a), bp = await start(b), cp = await start('outsider');
+  const followed = await (await area.fetch(reqAs(a, 'follow', { targetId: bp.self.id }, ap.token))).json();
+  const body = { roomId: followed.ticket.roomId };
+  for (const [account, presence] of [[a, ap], ['outsider', cp]]) assert.equal((await area.fetch(reqAs(account, 'decline', body, presence.token))).status, 409);
+  assert.equal((await area.fetch(reqAs(b, 'decline', { roomId: crypto.randomUUID() }, bp.token))).status, 409);
+  assert.equal(closures, 0);
+  assert.equal((await area.fetch(reqAs(b, 'decline', body, bp.token))).status, 503);
+  assert.ok(storage.get('area').people[bp.self.id].ticket);
+  available = true;
+  const restored = new NearbyArea(context(storage), env);
+  const result = await restored.fetch(reqAs(b, 'decline', body, bp.token));
+  assert.equal(result.status, 200); assert.equal((await result.json()).ticket, null);
+  assert.equal(storage.get('area').people[ap.self.id].ticket, null);
+  assert.equal(storage.get('area').people[bp.self.id].trackId, tracks[0].id);
+  assert.equal((await restored.fetch(reqAs(b, 'decline', body, bp.token))).status, 409);
+  assert.equal(closures, 2);
+});
+
+test("a decline arriving after acceptance cannot close the accepted room", async () => {
+  const storage = new Map(); let closures = 0;
+  const env = { ROOMS: { idFromName: id => id, get: () => ({ fetch: async request => {
+    if (request.url.endsWith('/status')) return Response.json({ active: true });
+    if (request.url.endsWith('/init')) return Response.json({ hostToken: 'host-token', guestToken: 'guest-token' });
+    closures++; return Response.json({ ok: true });
+  } }) } };
+  const area = new NearbyArea(context(storage), env);
+  const { tracks } = (await import('../lib/resonance/catalog.generated.json', { with: { type: 'json' } })).default;
+  const start = async account => (await area.fetch(reqAs(account, 'start', { trackId: tracks[0].id }))).json();
+  const ap = await start(a), bp = await start(b);
+  const followed = await (await area.fetch(reqAs(a, 'follow', { targetId: bp.self.id }, ap.token))).json();
+  const body = { roomId: followed.ticket.roomId };
+  assert.equal((await area.fetch(reqAs(b, 'accept', body, bp.token))).status, 200);
+  const restored = new NearbyArea(context(storage), env);
+  assert.equal((await restored.fetch(reqAs(b, 'decline', body, bp.token))).status, 409);
+  assert.equal(closures, 0);
+});

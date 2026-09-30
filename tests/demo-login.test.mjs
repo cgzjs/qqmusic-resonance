@@ -6,12 +6,12 @@ import { build } from "esbuild";
 const result = await build({ entryPoints: ["lib/resonance/demo-host.ts"], bundle: true, platform: "browser", format: "iife", globalName: "loginModule", write: false });
 const source = result.outputFiles[0].text;
 function environment() {
-  const local = new Map(), accounts = new Map(), locks = new Map(); let created = 0;
+  const local = new Map(), accounts = new Map(), locks = new Map(); let created = 0, preview = false;
   const storage = map => ({ getItem: key => map.get(key) ?? null, setItem: (key, value) => map.set(key, String(value)), removeItem: key => map.delete(key) });
   const response = (value, status = 200) => ({ ok: status < 400, status, json: async () => value });
   const fetch = async (url, options = {}) => {
     const body = options.body ? JSON.parse(options.body) : {};
-    if (url.endsWith('/config')) return response({ demo: true });
+    if (url.endsWith('/config')) return response({ demo: !preview, preview });
     if (url.endsWith('/create')) {
       created++;
       const identity = { accountId: webcrypto.randomUUID(), deviceKey: webcrypto.randomUUID() };
@@ -21,7 +21,7 @@ function environment() {
     if (url.endsWith('/resume')) {
       const account = accounts.get(options.headers['X-Account-Id']);
       if (account?.deviceKey !== body.deviceKey) return response({}, 401);
-      return response({ accountId: account.accountId, displayName: account.displayName, token: webcrypto.randomUUID(), mode: 'demo', expiresAt: Date.now() + 7200000 });
+      return response({ accountId: account.accountId, displayName: account.displayName, token: webcrypto.randomUUID(), mode: preview ? 'preview' : 'demo', expiresAt: Date.now() + 7200000 });
     }
     if (url.endsWith('/logout')) { assert.equal(body.scope, 'session'); return response({ ok: true }); }
     throw new Error(`Unexpected request ${url}`);
@@ -36,7 +36,7 @@ function environment() {
     const states = []; context.loginModule.demoHost.subscribe(state => states.push(state));
     return { host: context.loginModule.demoHost, session, states };
   }
-  return { tab, created: () => created };
+  return { tab, created: () => created, setPreview: value => { preview = value; } };
 }
 test('new tabs choose a login; A and B stay separate and survive refresh', async () => {
   const env = environment(), a = env.tab(), b = env.tab();
@@ -64,4 +64,21 @@ test('simultaneous same-profile login creates one identity and switching cannot 
   await Promise.all([old, next]);
   assert.equal(first.states.at(-1).session.displayName, '模拟听众 B');
   assert.equal(second.states.at(-1).session.displayName, '模拟听众 A');
+});
+
+test('preview restore uses its own browser identity and preserves the local-demo profile', async () => {
+  const env = environment(), local = env.tab();
+  const first = await local.host.switchAccount('A');
+  env.setPreview(true);
+  const preview = env.tab(local.session);
+  assert.equal((await preview.host.restore()).status, 'signed-out');
+  const joined = await preview.host.switchAccount('A');
+  assert.equal(joined.session.mode, 'preview');
+  assert.notEqual(joined.session.accountId, first.session.accountId);
+  const restored = await env.tab(preview.session).host.restore();
+  assert.equal(restored.session.accountId, joined.session.accountId);
+  env.setPreview(false);
+  const original = await env.tab(local.session).host.restore();
+  assert.equal(original.session.accountId, first.session.accountId);
+  assert.equal(original.session.mode, 'demo');
 });

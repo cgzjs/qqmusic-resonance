@@ -1,7 +1,10 @@
 import handler from "vinext/server/fetch-handler";
 import { UUID_PATTERN } from "../lib/resonance/room-protocol";
 import { audioTracks } from "../lib/resonance/demo-data";
-import { hostApi, verifyAccount, type AccountEnv } from "./host-api";
+import { hostApi, hostAccountScope, verifyAccount, type AccountEnv } from "./host-api";
+import { accountObjectName, bottleObjectName, nearbyObjectName } from "./account-scope";
+import { placeCopyApi } from "./place-copy";
+import { placeImageApi } from "./place-image";
 export { PluginAccount } from "./plugin-account";
 export { ListeningRoom } from "./listening-room";
 export { NearbyArea } from "./nearby-area";
@@ -11,58 +14,77 @@ export type RoomEnv = AccountEnv & { ROOMS: DurableObjectNamespace; NEARBY: Dura
 const worker = {
   async fetch(request: Request, env: RoomEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/nearby/") || url.pathname.startsWith("/api/host/")) {
+    // 先限量收完 API 上传流，再返回拒绝响应，避免预览代理中断未读请求流。
+    if (request.method === "POST" && (url.pathname.startsWith("/api/nearby/") || url.pathname.startsWith("/api/bottles/") || url.pathname.startsWith("/api/host/") || url.pathname.startsWith("/api/rooms") || url.pathname.startsWith("/api/ai/"))) {
+      const reader = request.body?.getReader();
+      const chunks: Uint8Array[] = []; let size = 0;
+      if (reader) while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > (url.pathname.startsWith("/api/bottles/") ? 512 * 1024 : url.pathname.startsWith("/api/ai/") ? 16 * 1024 : 1024)) { await reader.cancel(); return Response.json({ error: "BODY_TOO_LARGE" }, { status: 413 }); }
+        chunks.push(value);
+      }
+      const body = new Uint8Array(size); let offset = 0;
+      for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.length; }
+      request = new Request(request.url, { method: "POST", headers: request.headers, body });
+    }
+    if (url.pathname === "/api/ai/place-copy") {
       const origin = request.headers.get("Origin");
       if (origin && origin !== url.origin) return Response.json({ error: "INVALID_ORIGIN" }, { status: 403 });
-      if (!/^\/api\/(nearby\/(start|state|follow|accept|stop|track|blocks|block|unblock)|host\/(config|create|resume|logout|data))$/.test(url.pathname)) return new Response(null, { status: 404 });
+      if (request.method !== "POST") return Response.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405, headers: { Allow: "POST" } });
+      if (!request.headers.get("Content-Type")?.startsWith("application/json")) return Response.json({ error: "INVALID_BODY" }, { status: 415 });
+      if (!await verifyAccount(request, env)) return Response.json({ error: "AUTH_EXPIRED" }, { status: 401 });
+      return placeCopyApi(request, env);
+    }
+    if (url.pathname === "/api/ai/place-image") {
+      const origin = request.headers.get("Origin");
+      if (origin && origin !== url.origin) return Response.json({ error: "INVALID_ORIGIN" }, { status: 403 });
+      if (request.method !== "POST") return Response.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405, headers: { Allow: "POST" } });
+      if (!request.headers.get("Content-Type")?.startsWith("application/json")) return Response.json({ error: "INVALID_BODY" }, { status: 415 });
+      if (!await verifyAccount(request, env)) return Response.json({ error: "AUTH_EXPIRED" }, { status: 401 });
+      const scope = hostAccountScope(request, env)!;
+      const rate = await env.ACCOUNTS.get(env.ACCOUNTS.idFromName(accountObjectName(request.headers.get("X-Account-Id")!, scope))).fetch(new Request("https://account.internal/image-rate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: request.headers.get("X-Account-Id") }) }));
+      if (!rate.ok) return new Response(rate.body, { status: rate.status, headers: rate.headers });
+      return placeImageApi(request, env);
+    }
+    if (url.pathname.startsWith("/api/nearby/") || url.pathname.startsWith("/api/bottles/") || url.pathname.startsWith("/api/host/")) {
+      const origin = request.headers.get("Origin");
+      if (origin && origin !== url.origin) return Response.json({ error: "INVALID_ORIGIN" }, { status: 403 });
+      if (!/^\/api\/(nearby\/(start|state|follow|accept|decline|stop|track|blocks|block|unblock)|bottles\/(nearby|leave|withdraw)|host\/(config|create|resume|logout|data))$/.test(url.pathname)) return new Response(null, { status: 404 });
       if (request.method === "POST") {
         if (!request.headers.get("Content-Type")?.startsWith("application/json")) return new Response(null, { status: 415 });
-        const reader = request.body?.getReader();
-        const chunks: Uint8Array[] = []; let size = 0;
-        if (reader) while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          size += value.byteLength;
-          if (size > 1024) { await reader.cancel(); return new Response(null, { status: 413 }); }
-          chunks.push(value);
-        }
-        const body = new Uint8Array(size); let offset = 0;
-        for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.length; }
-        request = new Request(request.url, { method: "POST", headers: request.headers, body });
       }
       if (url.pathname.startsWith("/api/host/")) {
         try {
           const logoutOptions = url.pathname.endsWith("/logout") ? await request.clone().json<{ scope?: string }>() : null;
           const response = await hostApi(request, env);
           if (url.pathname.endsWith("/logout") && response.ok) {
-            await env.NEARBY.get(env.NEARBY.idFromName("demo-area-v1")).fetch(new Request("https://nearby.internal/revoke", { method: "POST", body: JSON.stringify({ accountId: request.headers.get("X-Account-Id"), ...(logoutOptions?.scope === "session" ? { accountToken: request.headers.get("X-Account-Token") } : {}) }) }));
+            await env.NEARBY.get(env.NEARBY.idFromName(nearbyObjectName(hostAccountScope(request, env) ?? "demo"))).fetch(new Request("https://nearby.internal/revoke", { method: "POST", body: JSON.stringify({ accountId: request.headers.get("X-Account-Id"), ...(logoutOptions?.scope === "session" ? { accountToken: request.headers.get("X-Account-Token") } : {}) }) }));
           }
           return response;
         } catch { return Response.json({ error: "INVALID_BODY" }, { status: 400 }); }
       }
       if (!await verifyAccount(request, env)) return Response.json({ error: "AUTH_EXPIRED" }, { status: 401 });
-      return env.NEARBY.get(env.NEARBY.idFromName("demo-area-v1")).fetch(request);
+      const scope = hostAccountScope(request, env)!;
+      const headers = new Headers(request.headers);
+      headers.set("X-Account-Scope", scope);
+      const bottleDemo = url.searchParams.get("experience") === "demo";
+      headers.set("X-Bottle-Demo", bottleDemo ? "true" : "false");
+      const name = url.pathname.startsWith("/api/bottles/") ? bottleObjectName(scope, bottleDemo ? headers.get("X-Account-Id")! : undefined) : nearbyObjectName(scope);
+      return env.NEARBY.get(env.NEARBY.idFromName(name)).fetch(new Request(request, { headers }));
     }
     if (!url.pathname.startsWith("/api/rooms")) return handler.fetch(request, env, ctx);
     const origin = request.headers.get("Origin");
     if (origin && origin !== url.origin) return Response.json({ error: "INVALID_ORIGIN" }, { status: 403 });
+    if (!hostAccountScope(request, env)) return Response.json({ error: "HOST_NOT_CONFIGURED" }, { status: 503 });
     if (url.pathname === "/api/rooms") {
+      // 公网体验从附近的账号会话创建房间，不开放旧匿名分享房入口。
+      if (hostAccountScope(request, env) !== "demo") return Response.json({ error: "NEARBY_REQUIRED" }, { status: 403 });
       if (request.method !== "POST") return Response.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405, headers: { Allow: "POST" } });
       if (!request.headers.get("Content-Type")?.startsWith("application/json")) return Response.json({ error: "INVALID_BODY" }, { status: 415 });
-      const reader = request.body?.getReader();
-      let text = "", size = 0;
-      if (reader) {
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) { text += decoder.decode(); break; }
-          size += value.byteLength;
-          if (size > 1024) { await reader.cancel(); return Response.json({ error: "BODY_TOO_LARGE" }, { status: 413 }); }
-          text += decoder.decode(value, { stream: true });
-        }
-      }
       let body: { trackId?: string };
-      try { body = JSON.parse(text); } catch { return Response.json({ error: "INVALID_BODY" }, { status: 400 }); }
+      try { body = await request.json(); } catch { return Response.json({ error: "INVALID_BODY" }, { status: 400 }); }
       if (!body || !audioTracks.some(track => track.id === body.trackId)) return Response.json({ error: "INVALID_TRACK" }, { status: 400 });
       const id = crypto.randomUUID();
       return env.ROOMS.get(env.ROOMS.idFromName(id)).fetch(new Request("https://room.internal/init", { method: "POST", body: JSON.stringify({ id, trackId: body.trackId }) }));

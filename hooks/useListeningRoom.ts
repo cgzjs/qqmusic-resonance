@@ -272,7 +272,7 @@ export function useListeningRoom(roomId: string) {
     setConnection("closed");
   }, [clearTimers, clearReactions]);
   const disconnect = useCallback(() => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ type: "leave" }));
+    // 卸载只断线，允许刷新/重新挂载后用同一 clientId 恢复；主动退出由 leave 发送。
     leavingRef.current = true; generationRef.current++; clearTimers(); clearReactions(); socketRef.current?.close();
   }, [clearTimers, clearReactions]);
   useEffect(() => disconnect, [disconnect]);

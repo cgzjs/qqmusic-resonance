@@ -14,7 +14,7 @@ const folder = path.resolve("node_modules/.cache/client-recovery");
 await mkdir(folder, { recursive: true });
 const bundle = path.join(folder, `client-recovery-${process.pid}.mjs`);
 const result = await build({
-  stdin: { contents: `export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useFollowerNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { RoomSession } from './components/resonance/RoomSession'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
+  stdin: { contents: `export { HostStatus } from './components/resonance/HostStatus'; export { ListeningArtwork } from './components/resonance/ListeningArtwork'; export { BlockListenerButton } from './components/resonance/ListenerSafety'; export { useListenerSafety } from './hooks/useListenerSafety'; export { CurrentPlaybackBar } from './components/resonance/CurrentPlaybackBar'; export { useFollowerNotification, useRoomExchangeNotification } from './hooks/useOnlineNotifications'; export { JourneySummary } from './components/resonance/JourneySummary'; export { ReceivedSongs } from './components/resonance/ReceivedSongs'; export { ResonanceExperience } from './components/resonance/ResonanceExperience'; export { useDemoReplies } from './hooks/useDemoReplies'; export { ReactionDock } from './components/resonance/ReactionDock'; export { useNearby } from './hooks/useNearby'; export { RoomSession } from './components/resonance/RoomSession'; export { useListeningRoom } from './hooks/useListeningRoom'; export { useRoomAudio } from './hooks/useRoomAudio'; export { OnlineNearbyPanel } from './components/resonance/OnlineNearbyPanel'; export { audioTracks } from './lib/resonance/demo-data';`, resolveDir: process.cwd(), loader: "tsx" },
   bundle: true, platform: "node", format: "esm", packages: "external", write: false,
   plugins: [{ name: "test-boundaries", setup(builder) {
     builder.onResolve({ filter: /^(sonner|@\/components\/ui\/sonner)$/ }, args => ({ path: args.path, namespace: "toast" }));
@@ -22,11 +22,11 @@ const result = await build({
     builder.onResolve({ filter: /^next\/image$/ }, () => ({ path: "image", namespace: "image" }));
     builder.onLoad({ filter: /.*/, namespace: "image" }, () => ({ resolveDir: process.cwd(), contents: "import React from 'react'; export default function Image({fill, unoptimized, priority, ...props}) { return React.createElement('img', props); }" }));
     builder.onResolve({ filter: /^(next\/navigation|\.\/HostProvider|@\/components\/resonance\/HostProvider|@\/lib\/resonance\/demo-host)$/ }, args => ({ path: args.path, namespace: "boundary" }));
-    builder.onLoad({ filter: /.*/, namespace: "boundary" }, args => ({ contents: args.path.includes("navigation") ? "export const useRouter = () => globalThis.recoveryTest.router;" : args.path.includes("HostProvider") ? "export const useHost = () => globalThis.recoveryTest.host ?? ({session: globalThis.recoveryTest.session});" : "export const hostFetch = async () => { throw new Error('Unexpected host request in this test'); }; export const demoHost = {setTrack: id => { globalThis.recoveryTest.host.trackId = id; }, expire: () => globalThis.recoveryTest.expired++};" }));
+    builder.onLoad({ filter: /.*/, namespace: "boundary" }, args => ({ contents: args.path.includes("navigation") ? "export const useRouter = () => globalThis.recoveryTest.router;" : args.path.includes("HostProvider") ? "export const useHost = () => globalThis.recoveryTest.host ?? ({session: globalThis.recoveryTest.session});" : "export const hostFetch = async () => { throw new Error('Unexpected host request in this test'); }; export const demoHost = {switchAccount: async slot => { (globalThis.recoveryTest.logins ??= []).push(slot); return globalThis.recoveryTest.loginResult ?? {status: 'ready'}; }, setTrack: id => { globalThis.recoveryTest.host.trackId = id; }, expire: () => globalThis.recoveryTest.expired++};" }));
   } }],
 });
 await writeFile(bundle, result.outputFiles[0].text);
-const { ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useFollowerNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, RoomSession, audioTracks } = await import(pathToFileURL(bundle));
+const { HostStatus, ListeningArtwork, BlockListenerButton, useListenerSafety, CurrentPlaybackBar, useFollowerNotification, useRoomExchangeNotification, JourneySummary, ReceivedSongs, ResonanceExperience, useDemoReplies, ReactionDock, useNearby, useListeningRoom, useRoomAudio, OnlineNearbyPanel, RoomSession, audioTracks } = await import(pathToFileURL(bundle));
 after(() => unlink(bundle));
 const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const token = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -215,6 +215,26 @@ test("cancelled invitations disappear on the next poll and a failed accept never
   assert.equal(current.room, null);
 });
 
+test("declining waits for acknowledgement, keeps playback and discovery, and leaves failures retryable", async () => {
+  const ticket = { roomId: id, token, role: 'host', peerAlias: '听众 B' };
+  respond = async () => response({ ...nearby({ ticket }), token });
+  await mount('nearby'); await act(async () => current.request('start', {}));
+  const decline = () => [...document.querySelectorAll('button')].find(button => button.textContent === '暂不加入');
+  let complete;
+  respond = () => new Promise(resolve => { complete = resolve; });
+  await act(async () => decline().click());
+  assert.equal(decline().disabled, true); assert.ok(document.querySelector('.tp-invitation'));
+  await act(async () => complete(response({ error: 'CONNECT_FAILED' }, 503)));
+  assert.ok(document.querySelector('.tp-invitation')); assert.match(current.error, /没连上/);
+  respond = async url => response(url.endsWith('/decline') ? nearby() : nearby({ ticket }));
+  await act(async () => current.request('state'));
+  await act(async () => decline().click());
+  assert.deepEqual(JSON.parse(calls.find(item => item.url?.endsWith('/decline')).options.body), { roomId: id });
+  assert.equal(document.querySelector('.tp-invitation'), null);
+  assert.equal(current.room, null); assert.ok(current.snapshot);
+  assert.equal(calls.some(item => item.pause || item.play || item.route || item.url?.endsWith('/stop')), false);
+});
+
 test("a queued follow is discarded after offline; late poll cannot restore readiness", async t => {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
   await mount("nearby"); await act(async () => current.request("start", {}));
@@ -251,6 +271,43 @@ test("room ticket enters in place: presence stops, no navigation, leaving clears
   await act(async () => current.leaveSession());
   assert.equal(current.room, null);
   assert.equal(sessionStorage.getItem("resonance.nearby-room.account-a.active"), null);
+});
+
+test("room unmount disconnects without leaving, retains the tab identity, and ignores stale socket messages", async () => {
+  await mount(); const old = await welcome();
+  const hello = old.sent.find(message => message.type === 'hello');
+  await act(async () => root.render(null));
+  assert.equal(old.readyState, 3);
+  assert.equal(old.sent.some(message => message.type === 'leave'), false);
+  assert.equal(sessionStorage.getItem(`resonance.nearby-room.account-a.${id}`), token);
+  await mount(); const replacement = await welcome();
+  const nextHello = replacement.sent.find(message => message.type === 'hello');
+  assert.equal(nextHello.clientId, hello.clientId, 'refresh/remount retains the reserved seat');
+  assert.equal(nextHello.token, hello.token);
+  await act(async () => old.message({ type: 'state', room: room({ closed: true, revision: 999 }), serverTime: Date.now() }));
+  assert.equal(current.connection, 'connected');
+  assert.equal(current.room.closed, false);
+  await act(async () => current.leave());
+  assert.equal(replacement.sent.filter(message => message.type === 'leave').length, 1, 'explicit exit still leaves the room');
+});
+
+test("unmount during a pending room probe cannot open a late socket", async () => {
+  let complete;
+  respond = () => new Promise(resolve => { complete = resolve; });
+  await mount();
+  await act(async () => root.render(null));
+  await act(async () => complete(response({ active: true })));
+  assert.equal(sockets.length, 0);
+});
+
+test("StrictMode room setup can reconnect without sending an accidental leave", async () => {
+  recoveryTest.host = { session: recoveryTest.session, save: async () => true };
+  await act(async () => root.render(React.createElement(React.StrictMode, null, React.createElement(RoomSession, { roomId: id, player, variant: 'inline', onExit() {} }))));
+  await flush();
+  assert.equal(sockets.length, 1, 'the cancelled first setup does not open another socket');
+  await welcome();
+  await act(async () => root.render(null));
+  assert.equal(sockets[0].sent.some(message => message.type === 'leave'), false);
 });
 
 test("inline room joins on mount without a confirm screen and exits without navigation", async () => {
@@ -379,9 +436,16 @@ test("demo listeners share the nearby and room screens; a gift is one-way and la
     await act(async () => button.click());
   };
   assert.ok(document.querySelector(".tp-nearby"), "demo listeners use the same nearby radar as real ones");
+  assert.equal(document.querySelectorAll(".orbit-listener").length, audioTracks.length);
+  assert.deepEqual([...document.querySelectorAll(".orbit-listener")].map(button => button.getAttribute("aria-label")), audioTracks.map(track => `查看在线歌曲 ${track.track}`));
+  assert.equal(document.querySelector(".tp-mode-options"), null);
+  assert.equal(document.querySelector(".tp-listener-note"), null);
+  assert.equal(document.querySelector(".phone-stage__content").textContent.includes("模拟"), false);
   await click("跟 TA 一起听");
   assert.ok(document.querySelector(".tp-room-session"), "following a demo listener opens the shared room screen");
   assert.equal(document.querySelector(".bottom-nav"), null);
+  assert.equal(document.querySelector(".tp-room-status").textContent, "已连接");
+  assert.equal(document.querySelector(".tp-demo-caption"), null);
   await click("挑一首");
   const send = [...document.querySelectorAll("button")].find(item => item.textContent.startsWith("送出《"));
   assert.ok(send);
@@ -393,11 +457,28 @@ test("demo listeners share the nearby and room screens; a gift is one-way and la
   assert.match(document.body.textContent, /已送给 TA/);
   assert.equal(recoveryTest.toasts.length, 0);
   await click("结束一起听");
-  assert.ok(document.querySelector(".tp-nearby"));
+  assert.equal(document.querySelector(".tp-room-session"), null);
   await click("足迹与收藏");
   assert.match(document.body.textContent, /一起听时送给 TA/);
   const total = [...document.querySelectorAll(".stat-grid article")].find(item => item.textContent.includes("今日送歌"));
   assert.equal(total.querySelector("strong").textContent, "1");
+});
+
+test("login owns the experience choice and normal A/B login switches back to online mode", async () => {
+  recoveryTest.host = { status: "signed-out", session: null };
+  const choices = [];
+  await act(async () => root.render(React.createElement(HostStatus, { onSelectSource: source => choices.push(source) })));
+  const experience = [...document.querySelectorAll("button")].find(button => button.textContent === "单人体验");
+  assert.ok(experience); assert.match(document.body.textContent, /模拟听众自动回应/);
+  let finish;
+  recoveryTest.loginResult = new Promise(resolve => { finish = resolve; });
+  await act(async () => experience.click());
+  assert.deepEqual(choices, ["demo"]); assert.deepEqual(recoveryTest.logins, ["A"]);
+  assert.ok([...document.querySelectorAll("button")].every(button => button.disabled));
+  await act(async () => finish({ status: "ready" }));
+  recoveryTest.loginResult = { status: "ready" };
+  await act(async () => document.querySelector('button[aria-label="登录听众 B"]').click());
+  assert.deepEqual(choices, ["demo", "online"]); assert.deepEqual(recoveryTest.logins, ["A", "B"]);
 });
 
 test("received list does not mark on mount; opening unavailable songs supports read failure and retry", async () => {
@@ -461,6 +542,23 @@ test("host notification waits for an explicit click, keeps the latest handler an
   await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket, roomId: token, role: "guest" } })));
   assert.equal(recoveryTest.toasts.length, 1);
   assert.ok(recoveryTest.dismissedToasts.includes(`nearby-follower-${id}`));
+});
+
+test("invitation toast offers decline and stale toast actions cannot affect a newer invitation", async () => {
+  let accepted = 0, declined = 0;
+  function Harness({ ticket, count = 1 }) { useFollowerNotification(ticket, () => accepted += count, () => declined += count); return null; }
+  const ticket = { roomId: id, token, role: 'host', peerAlias: '听众 B' };
+  await act(async () => root.render(React.createElement(Harness, { ticket })));
+  const first = recoveryTest.toasts[0];
+  assert.equal(first.cancel.label, '暂不加入'); assert.equal(declined, 0);
+  await act(async () => root.render(React.createElement(Harness, { ticket, count: 2 })));
+  await act(async () => first.cancel.onClick());
+  assert.equal(declined, 2);
+  await act(async () => root.render(React.createElement(Harness, { ticket: { ...ticket, roomId: token } })));
+  await act(async () => { first.cancel.onClick(); first.action.onClick(); });
+  assert.equal(declined, 2); assert.equal(accepted, 0);
+  await act(async () => recoveryTest.toasts[1].cancel.onClick());
+  assert.equal(declined, 3);
 });
 
 test("room gift toasts only the recipient, once per gift", async () => {
@@ -543,6 +641,28 @@ test("late safety responses after account switch cannot expire the new account o
   assert.equal(current.busy, false);
 });
 
+
+test("music connection updates with the current song and selected listener without inventing matches", async () => {
+  const track = audioTracks[0];
+  const sameArtist = audioTracks.find(item => item.id !== track.id && item.artist === track.artist);
+  const otherArtist = audioTracks.find(item => item.artist !== track.artist);
+  assert.ok(sameArtist); assert.ok(otherArtist);
+  const connection = { snapshot: nearby({ peers: [{ id: token, alias: "听众 B", trackId: track.id }, { id: "listener-c", alias: "听众 C", trackId: otherArtist.id }] }), busy: false, error: null, ready: true, online: true, request: async () => {} };
+  const render = currentTrackId => act(async () => root.render(React.createElement(OnlineNearbyPanel, { nearby: connection, currentTrackId })));
+  const label = () => document.querySelector('.tp-music-connection')?.textContent ?? null;
+  await render(track.id);
+  assert.equal(label(), '与你同曲');
+  await render(sameArtist.id);
+  assert.equal(label(), '同一位歌手');
+  await render(otherArtist.id);
+  assert.equal(label(), null, 'unrelated music does not imply shared taste');
+  await act(async () => [...document.querySelectorAll('.tp-chip')].find(button => button.textContent.includes('听众 C')).click());
+  assert.equal(label(), '与你同曲', 'selecting a listener recomputes the connection');
+  await render(null);
+  assert.equal(label(), null, 'a missing current song has no match');
+  await render('missing-track');
+  assert.equal(label(), null, 'an unknown current song has no match');
+});
 
 test("record effects follow actual playback, respect quiet mode and visibility, and reuse the existing player", async () => {
   const track = audioTracks[0];

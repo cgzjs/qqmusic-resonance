@@ -24,7 +24,7 @@ const sweepDelay = (x: number, y: number) => {
 };
 const radarNodes = [[149, 130], [301, 229], [204, 225]].map(([x, y]) => ({ x, y, delay: sweepDelay(x, y) }));
 const matchDelay = sweepDelay(297, 77);
-const chapterStatus = [`${signal.distanceLabel} · ${signal.similarity}% 同频`, "与 TA 同步播放中", "匿名交换，各送一首"];
+const chapterStatus = ["音乐相遇 · 发现正在听的歌", "与 TA 同步播放中", "匿名交换，各送一首"];
 const bars = Array.from({ length: 48 }, (_, index) => Math.round(12 + Math.abs(Math.sin(index * .73) * Math.cos(index * .21)) * 78));
 // Interpolate the illustrative envelope into fine, asymmetric audio samples.
 // Integer arithmetic keeps server/client SVG attributes identical.
@@ -98,7 +98,7 @@ function SignalDisplay({ chapterIndex }: { chapterIndex: number }) {
             <g className="signal-radar__nodes">{radarNodes.map(node => <circle key={node.x} cx={node.x} cy={node.y} r="4" style={{ animationDelay: node.delay }} />)}</g>
             <g className="signal-radar__pings">{[...radarNodes, { x: 297, y: 77, delay: matchDelay }].map(node => <circle key={node.x} cx={node.x} cy={node.y} r="5" style={{ animationDelay: node.delay }} />)}</g>
             <circle className="signal-radar__you" cx="240" cy="145" r="5" /><text x="253" y="151" className="signal-radar__label">YOU</text>
-            <text x="317" y="82" className="signal-radar__active-label">{signal.similarity}%</text>
+            <text x="317" y="82" className="signal-radar__active-label">在听</text>
           </svg>
         </div>}
         {chapterIndex === 1 && <SharedWave />}

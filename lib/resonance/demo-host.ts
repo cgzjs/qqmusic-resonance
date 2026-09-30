@@ -6,14 +6,18 @@ type DemoIdentity = { accountId: string; deviceKey: string; signedOut?: boolean 
 const listeners = new Set<(state: HostSnapshot) => void>();
 let state: HostSnapshot = { status: "loading", session: null, trackId: null, error: null };
 let slot: "A" | "B" = "A";
+let profile: "demo" | "preview" = "demo";
 let generation = 0;
-const identityKey = () => `resonance.mock-host.identity.${slot}`;
-const trackKey = () => `resonance.mock-host.track.${slot}`;
+const profilePrefix = () => profile === "preview" ? "resonance.preview-host" : "resonance.mock-host";
+const identityKey = () => `${profilePrefix()}.identity.${slot}`;
+const trackKey = () => `${profilePrefix()}.track.${slot}`;
+const slotKey = () => `${profilePrefix()}.slot`;
 const emit = (next: HostSnapshot) => { state = next; listeners.forEach(listener => listener(next)); return next; };
 
 export async function hostFetch(path: string, session: HostSession | null, body?: object) {
   const response = await fetch(`/api/host/${path}`, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", ...(session ? accountHeaders(session) : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), cache: "no-store", signal: AbortSignal.timeout(8000) });
   if (response.status === 401) throw new Error("AUTH_EXPIRED");
+  if (response.status === 429) throw new Error("体验账号创建太频繁，请稍后再试");
   if (!response.ok) throw new Error("HOST_REQUEST_FAILED");
   return response;
 }
@@ -22,10 +26,11 @@ async function restore(force = false): Promise<HostSnapshot> {
   const run = ++generation;
   emit({ ...state, status: "loading", session: null, error: null });
   try {
-    const config = await (await hostFetch("config", null)).json() as { demo: boolean };
+    const config = await (await hostFetch("config", null)).json() as { demo: boolean; preview?: boolean };
     if (run !== generation) return state;
-    if (!config.demo) return emit({ status: "unavailable", session: null, trackId: null, error: "请在 QQ 音乐里打开同频。" });
-    const selected = sessionStorage.getItem("resonance.mock-host.slot");
+    if (!config.demo && !config.preview) return emit({ status: "unavailable", session: null, trackId: null, error: "请在 QQ 音乐里打开同频。" });
+    profile = config.preview ? "preview" : "demo";
+    const selected = sessionStorage.getItem(slotKey());
     if (selected !== "A" && selected !== "B") return emit({ status: "signed-out", session: null, trackId: null, error: null });
     slot = selected;
     const selectedIdentityKey = identityKey(), selectedTrackKey = trackKey();
@@ -42,7 +47,7 @@ async function restore(force = false): Promise<HostSnapshot> {
       return identity;
     };
     // Tabs selecting the same local identity should not race to create two accounts.
-    const identity = navigator.locks ? await navigator.locks.request(`resonance-profile-${selected}`, loadIdentity) : await loadIdentity();
+    const identity = navigator.locks ? await navigator.locks.request(`${profilePrefix()}-${selected}`, loadIdentity) : await loadIdentity();
     if (run !== generation) return state;
     if (!identity) return emit({ status: "signed-out", session: null, trackId: null, error: null });
     const response = await fetch("/api/host/resume", { method: "POST", headers: { "Content-Type": "application/json", "X-Account-Id": identity.accountId }, body: JSON.stringify({ deviceKey: identity.deviceKey }), signal: AbortSignal.timeout(8000) });
@@ -55,15 +60,15 @@ async function restore(force = false): Promise<HostSnapshot> {
     return emit({ status: "ready", session, trackId, error: null });
   } catch (error) {
     if (run !== generation) return state;
-    return emit({ status: "unavailable", session: null, trackId: null, error: error instanceof Error && error.message.startsWith("无法") ? error.message : "读取登录失败，请检查网络后重试" });
+    return emit({ status: "unavailable", session: null, trackId: null, error: error instanceof Error && (error.message.startsWith("无法") || error.message.startsWith("体验账号")) ? error.message : "读取登录失败，请检查网络后重试" });
   }
 }
 
 export const demoHost: HostAdapter & { chooseAccount(): void; switchAccount(slot: "A" | "B"): Promise<HostSnapshot>; setTrack(trackId: string | null): void; logout(): Promise<void>; expire(): void } = {
   restore: () => restore(), requestAuthorization: () => restore(true),
   subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
-  chooseAccount() { sessionStorage.removeItem("resonance.mock-host.slot"); generation++; emit({ status: "signed-out", session: null, trackId: null, error: null }); },
-  async switchAccount(next) { sessionStorage.setItem("resonance.mock-host.slot", next); return restore(true); },
+  chooseAccount() { sessionStorage.removeItem(slotKey()); generation++; emit({ status: "signed-out", session: null, trackId: null, error: null }); },
+  async switchAccount(next) { sessionStorage.setItem(slotKey(), next); return restore(true); },
   setTrack(trackId) {
     // Empty string represents a host without a current song.
     localStorage.setItem(trackKey(), trackId ?? "none"); emit({ ...state, trackId });
@@ -73,7 +78,7 @@ export const demoHost: HostAdapter & { chooseAccount(): void; switchAccount(slot
     if (!session) return;
     await hostFetch("logout", session, { scope: "session" });
     if (state.session?.token !== session.token) return;
-    sessionStorage.removeItem("resonance.mock-host.slot");
+    sessionStorage.removeItem(slotKey());
     generation++; emit({ status: "signed-out", session: null, trackId: null, error: null });
   },
   expire() { generation++; emit({ status: "expired", session: null, trackId: null, error: "登录已过期，已停止播放" }); },

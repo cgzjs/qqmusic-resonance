@@ -6,19 +6,21 @@ import { BlockedListeners } from "./ListenerSafety";
 import { demoHost, hostFetch } from "@/lib/resonance/demo-host";
 import { audioTracks } from "@/lib/resonance/demo-data";
 
-export function HostStatus() {
+type ExperienceSource = "demo" | "online";
+export function HostStatus({ onSelectSource }: { onSelectSource?: (source: ExperienceSource) => void } = {}) {
   const host = useHost();
-  if (host.status === "signed-out" || host.status === "expired") return <LoginPicker expired={host.status === "expired"} />;
+  if (host.status === "signed-out" || host.status === "expired") return <LoginPicker expired={host.status === "expired"} onSelectSource={onSelectSource} />;
   return <section className="plugin-host-status" role="status"><Radio size={28} aria-hidden="true" /><h2>{host.status === "loading" ? "正在读取登录状态" : "暂时连不上"}</h2><p>{host.error ?? "用 QQ 音乐账号登录，无需注册"}</p>{host.status !== "loading" && <button className="room-primary" onClick={() => void demoHost.requestAuthorization()}><RefreshCw size={16} aria-hidden="true" />重新连接</button>}</section>;
 }
 
-function LoginPicker({ expired }: { expired: boolean }) {
-  const [busy, setBusy] = useState<"A" | "B" | null>(null);
+function LoginPicker({ expired, onSelectSource }: { expired: boolean; onSelectSource?: (source: ExperienceSource) => void }) {
+  const [busy, setBusy] = useState<"A" | "B" | "experience" | null>(null);
   const [error, setError] = useState("");
-  async function login(slot: "A" | "B") {
+  async function login(slot: "A" | "B", source: ExperienceSource = "online") {
     if (busy) return;
-    setBusy(slot); setError("");
+    setBusy(source === "demo" ? "experience" : slot); setError("");
     try {
+      onSelectSource?.(source);
       const result = await demoHost.switchAccount(slot);
       if (result.status !== "ready") setError(result.error ?? "登录失败，请重试");
     } catch { setError("登录失败，请允许浏览器保存网站数据"); }
@@ -35,7 +37,8 @@ function LoginPicker({ expired }: { expired: boolean }) {
       <span className="login-record" aria-hidden="true"><span className="login-record-grooves" /><span className="login-record-label">{slot}<i /></span></span>
       <span className="login-card-bottom"><span><strong>听众 {slot}</strong><small>{busy === slot ? "正在登录…" : "进入同频"}</small></span><span className="login-card-arrow" aria-hidden="true"><ArrowUpRight size={20} strokeWidth={1.5} /></span></span>
     </button>)}</div>
-    <p className="account-login-note">双页测试时，分别选择 A / B。</p>
+    <p className="account-login-note">双页测试时，分别选择 A / B。附近共听为演示区域；地点留声需允许定位。</p>
+    {onSelectSource && <div className="tp-login-experience"><button type="button" className="tp-btn tp-btn--quiet" disabled={!!busy} aria-busy={busy === "experience"} onClick={() => void login("A", "demo")}><Headphones size={18} aria-hidden="true" />{busy === "experience" ? "正在进入…" : "单人体验"}</button><p>模拟听众自动回应，无需另开窗口；位置和留言使用独立的预置体验数据。</p></div>}
     {error && <p className="room-error" role="alert">{error}</p>}
   </section>;
 }

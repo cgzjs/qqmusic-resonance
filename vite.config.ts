@@ -1,5 +1,5 @@
 import vinext from "vinext";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
@@ -12,6 +12,23 @@ const { d1, r2 } = hostingConfig;
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
+
+// 当前 Rolldown 对带缓存副作用的动态导入返回了 chunk namespace；
+// 以静态 namespace 保留导航的真实导出与原有异步缓存接口。
+function navigationNamespaceCompat(): Plugin {
+  const modules = [["./navigation.js", "resonanceNavigation"], ["../server/app-elements.js", "resonanceAppElements"], ["../server/app-rsc-cache-busting.js", "resonanceCacheBusting"], ["../server/app-rsc-render-mode.js", "resonanceRenderMode"], ["../server/headers.js", "resonanceHeaders"]];
+  return { name: "resonance-navigation-namespace", apply: "build", enforce: "pre", transform(source, id) {
+    if (!id.replaceAll("\\", "/").split("?")[0].endsWith("/vinext/dist/shims/link.js")) return null;
+    for (const [path, name] of modules) {
+      const target = `import("${path}")`;
+      if (!source.includes(target)) throw new Error("Vinext Link 结构已变化，请重新核验导航兼容修正");
+      source = source.replaceAll(target, `Promise.resolve(${name})`);
+    }
+    if (!source.startsWith('"use client";')) throw new Error("Vinext Link 客户端边界已变化，请重新核验兼容修正");
+    const imports = modules.map(([path, name]) => `import * as ${name} from "${path}";`).join("\n");
+    return { code: source.replace('"use client";', `"use client";\n${imports}`), map: null };
+  } };
+}
 
 const localBindingConfig = {
   main: "./server/worker.ts",
@@ -58,6 +75,7 @@ export default defineConfig(async ({ command }) => {
       ...(isCodexSeatbeltSandbox ? { watch: { useFsEvents: false, usePolling: true } } : {}),
     },
     plugins: [
+      navigationNamespaceCompat(),
       vinext(),
       sites({ mockAuth: !managedLinux }),
       cloudflare({
