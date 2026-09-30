@@ -6,18 +6,20 @@ import type { SessionTicket } from "@/lib/resonance/nearby-protocol";
 import type { RoomRole, RoomSnapshot } from "@/lib/resonance/room-protocol";
 
 // 侧边邀请不打断当前页面，只有点击加入才进入房间。
-export function useFollowerNotification(ticket: SessionTicket | null, onAccept: () => void) {
+export function useFollowerNotification(ticket: SessionTicket | null, onAccept: () => void, onDecline?: () => void) {
   const roomId = ticket?.role === "host" ? ticket.roomId : null, alias = ticket?.peerAlias;
-  const accept = useRef(onAccept);
-  useEffect(() => { accept.current = onAccept; }, [onAccept]);
+  const hasDecline = !!onDecline;
+  const handlers = useRef({ roomId, onAccept, onDecline });
+  useEffect(() => { handlers.current = { roomId, onAccept, onDecline }; }, [roomId, onAccept, onDecline]);
   useEffect(() => {
     if (!roomId) return;
     const id = `nearby-follower-${roomId}`;
     toast(`${alias} 想和你一起听`, { id, description: "TA 已在房间等你，准备好了再加入", duration: Infinity,
-      action: { label: "加入一起听", onClick: () => accept.current() },
+      action: { label: "加入一起听", onClick: () => { if (handlers.current.roomId === roomId) handlers.current.onAccept(); } },
+      cancel: hasDecline ? { label: "暂不加入", onClick: () => { if (handlers.current.roomId === roomId) handlers.current.onDecline?.(); } } : undefined,
     });
     return () => { toast.dismiss(id); };
-  }, [roomId, alias]);
+  }, [roomId, alias, hasDecline]);
 }
 
 // TA 送来一首时提醒一次；自己送出的由面板显示“已送给 TA”。

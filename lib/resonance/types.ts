@@ -1,6 +1,6 @@
 export type SceneId = "metro" | "campus" | "cafe";
 
-export type AppView = "radar" | "journey";
+export type AppView = "radar" | "journey" | "bottles";
 
 export type SongSuggestion = {
   coverUrl?: string;

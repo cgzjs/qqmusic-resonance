@@ -26,6 +26,10 @@ export function NearbyRadar({ peers: allPeers, visible, ready, online, busy, err
   const selected = peers.find(peer => peer.id === selectedId) ?? peers[0];
   const selectedTrack = selected && audioTracks.find(track => track.id === selected.trackId);
   const currentTrack = audioTracks.find(track => track.id === currentTrackId);
+  const musicConnection = currentTrack && selectedTrack
+    ? currentTrack.id === selectedTrack.id ? "与你同曲"
+      : currentTrack.artist.trim() && currentTrack.artist.trim() === selectedTrack.artist.trim() ? "同一位歌手" : null
+    : null;
   const isCurrent = !!currentTrack && player?.track?.id === currentTrack.id;
   const playing = isCurrent && player?.status === "playing";
   const loading = isCurrent && player?.status === "loading" && player.wantsPlayback;
@@ -47,7 +51,7 @@ export function NearbyRadar({ peers: allPeers, visible, ready, online, busy, err
       <button type="button" role="switch" aria-checked={visible} className="tp-switch" disabled={switchDisabled} onClick={onVisibleChange}><span>{busy ? "稍等…" : "附近可见"}</span><span className="tp-switch-track" aria-hidden="true" /></button>
     </div>
     {selected && selectedTrack && <article id="selected-nearby-person" className="tp-sheet" key={selected.id}>
-      <div className="tp-sheet-row"><AlbumTile coverUrl={selectedTrack.coverUrl} accent={selectedTrack.accent} size="md" /><div className="tp-sheet-meta"><p className="tp-sheet-who">{selected.alias} 正在听</p><h3>{selectedTrack.track}</h3><p className="tp-sheet-copy">{selectedTrack.artist}</p></div></div>
+      <div className="tp-sheet-row"><AlbumTile coverUrl={selectedTrack.coverUrl} accent={selectedTrack.accent} size="md" /><div className="tp-sheet-meta"><p className="tp-sheet-who">{selected.alias} 正在听</p><h3>{selectedTrack.track}</h3><p className="tp-sheet-copy">{selectedTrack.artist}</p>{musicConnection && <span className="tp-music-connection">{musicConnection}</span>}</div></div>
       <div className="tp-actions"><button type="button" className="tp-btn tp-btn--primary" disabled={busy || !ready} aria-busy={busy} onClick={() => onFollow(selected)}><Headphones size={18} aria-hidden="true" />{busy ? "正在连上…" : "跟 TA 一起听"}</button>{safety?.(selected)}</div>
     </article>}
     {peers.length > 1 && <div className="tp-chips" role="group" aria-label="附近的人">{peers.map(peer => <button type="button" className="tp-chip" key={peer.id} aria-pressed={selected?.id === peer.id} onClick={() => setSelectedId(peer.id)}><b>{peer.alias}</b>{audioTracks.find(track => track.id === peer.trackId)?.track}</button>)}</div>}
@@ -60,7 +64,7 @@ type Props = { nearby: ReturnType<typeof useNearby>; currentTrackId: string | nu
 export function OnlineNearbyPanel({ nearby, currentTrackId, player }: Props) {
   const { snapshot, busy, error, ready, online, request } = nearby;
   const invitation = snapshot?.ticket?.role === "host" ? snapshot.ticket : null;
-  return <>{invitation && <aside className="tp-invitation" aria-label="一起听邀请"><Headphones size={20} aria-hidden="true" /><div><strong>{invitation.peerAlias} 想和你一起听</strong><p>TA 在房间等你，准备好了再加入</p></div><button type="button" className="tp-btn tp-btn--primary" disabled={busy || !ready || !online} aria-busy={busy} onClick={() => void request("accept", { roomId: invitation.roomId })}>{busy ? "正在加入…" : "加入一起听"}</button></aside>}<NearbyRadar peers={snapshot?.peers ?? []} visible={!!snapshot} ready={ready} online={online} busy={busy} error={error} currentTrackId={currentTrackId} player={player}
+  return <>{invitation && <aside className="tp-invitation" aria-label="一起听邀请"><Headphones size={20} aria-hidden="true" /><div><strong>{invitation.peerAlias} 想和你一起听</strong><p>TA 在房间等你，准备好了再加入</p></div><button type="button" className="tp-btn tp-btn--primary" disabled={busy || !ready || !online} aria-busy={busy} onClick={() => void request("accept", { roomId: invitation.roomId })}>{busy ? "正在处理…" : "加入一起听"}</button><button type="button" className="tp-btn tp-btn--quiet" disabled={busy || !ready || !online} aria-busy={busy} onClick={() => void request("decline", { roomId: invitation.roomId })}>暂不加入</button></aside>}<NearbyRadar peers={snapshot?.peers ?? []} visible={!!snapshot} ready={ready} online={online} busy={busy} error={error} currentTrackId={currentTrackId} player={player}
     switchDisabled={busy || !!snapshot?.ticket || (!snapshot && (!currentTrackId || !online))}
     onVisibleChange={() => void request(snapshot ? "stop" : "start", snapshot ? {} : { trackId: currentTrackId })}
     onFollow={peer => void request("follow", { targetId: peer.id })}

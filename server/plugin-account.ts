@@ -7,7 +7,8 @@ import { emptyAccountData, type AccountData } from "../lib/resonance/host-protoc
 import { receivedSongs } from "../lib/resonance/received-songs";
 import type { DemoReply } from "../lib/resonance/demo-reply";
 import { DEMO_RESPONSE_MS } from "../lib/resonance/demo-motion";
-type RecordData = { accountId: string; displayName: string; deviceHash: string; sessions: { hash: string; expiresAt: number }[]; data: AccountData };
+import type { AccountScope } from "./account-scope";
+type RecordData = { accountId: string; displayName: string; deviceHash: string; mode?: AccountScope; sessions: { hash: string; expiresAt: number }[]; data: AccountData };
 const slug = (value: unknown) => typeof value === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 // 送 TA 一首是单向的：一方只记送出、另一方只记收到；旧版交换两边都有，且不能是同一首。
 const validGift = (sent: unknown, received: unknown) => (sent === undefined || slug(sent)) && (received === undefined || slug(received)) && (sent !== undefined || received !== undefined) && sent !== received;
@@ -48,7 +49,10 @@ export class PluginAccount extends DurableObject<Cloudflare.Env> {
     const pending = this.record.data.demoReplies.filter(item => item.status === "pending");
     if (pending.length) await this.ctx.storage.setAlarm(Math.min(...pending.map(item => item.dueAt)));
   }
-  async alarm() { await this.ctx.blockConcurrencyWhile(() => this.settleReplies()); }
+  async alarm() { await this.ctx.blockConcurrencyWhile(async () => {
+    if (!this.record) { await this.ctx.storage.delete("preview-rate"); return; }
+    await this.settleReplies();
+  }); }
   async fetch(request: Request): Promise<Response> {
     return this.ctx.blockConcurrencyWhile(async () => {
       const action = new URL(request.url).pathname.split("/").pop();
@@ -58,9 +62,32 @@ export class PluginAccount extends DurableObject<Cloudflare.Env> {
         try { body = await request.json(); } catch { return reply({ error: "INVALID_BODY" }, 400); }
         if (!body || typeof body !== "object" || Array.isArray(body)) return reply({ error: "INVALID_BODY" }, 400);
       }
+      // 内部限流对象：同一来源十分钟内最多创建 16 个体验身份。
+      if (action === "preview-rate" && request.method === "POST" && !this.record) {
+        const now = Date.now();
+        const stored = await this.ctx.storage.get<{ startedAt: number; count: number }>("preview-rate");
+        const window = stored && now - stored.startedAt < 600_000 ? stored : { startedAt: now, count: 0 };
+        if (window.count >= 16) return Response.json({ error: "RATE_LIMIT" }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(Math.max(1, Math.ceil((window.startedAt + 600_000 - now) / 1000))) } });
+        await this.ctx.storage.put("preview-rate", { ...window, count: window.count + 1 });
+        await this.ctx.storage.setAlarm(window.startedAt + 600_000);
+        return reply({ ok: true });
+      }
+      if (action === "image-rate" && request.method === "POST") {
+        if (!this.record || body.accountId !== this.record.accountId) return reply({ error: "AUTH_REQUIRED" }, 401);
+        const now = Date.now();
+        const stored = await this.ctx.storage.get<number[]>("image-rate") ?? [];
+        const recent = stored.filter(timestamp => Number.isFinite(timestamp) && now - timestamp < 24 * 60 * 60 * 1000);
+        const hourly = recent.filter(timestamp => now - timestamp < 60 * 60 * 1000);
+        const latest = recent.at(-1) ?? 0;
+        if (now - latest < 15_000) return reply({ error: "IMAGE_COOLDOWN", retryAfter: Math.ceil((15_000 - (now - latest)) / 1000) }, 429);
+        if (hourly.length >= 20) return reply({ error: "IMAGE_HOURLY_LIMIT", retryAfter: Math.ceil((60 * 60 * 1000 - (now - hourly[0])) / 1000) }, 429);
+        await this.ctx.storage.put("image-rate", [...recent, now].slice(-100));
+        return reply({ ok: true });
+      }
       if (action === "init" && !this.record) {
+        if (body.mode !== undefined && body.mode !== "demo" && body.mode !== "preview") return reply({ error: "INVALID_PROFILE" }, 400);
         const deviceKey = crypto.randomUUID();
-        this.record = { accountId: body.accountId as string, displayName: body.displayName as string, deviceHash: await digest(deviceKey), sessions: [], data: structuredClone(emptyAccountData) };
+        this.record = { accountId: body.accountId as string, displayName: body.displayName as string, mode: body.mode === "preview" ? "preview" : "demo", deviceHash: await digest(deviceKey), sessions: [], data: structuredClone(emptyAccountData) };
         await this.ctx.storage.put("account", this.record);
         return reply({ accountId: this.record.accountId, deviceKey }, 201);
       }
@@ -83,7 +110,7 @@ export class PluginAccount extends DurableObject<Cloudflare.Env> {
         const token = crypto.randomUUID(), expiresAt = Date.now() + 2 * 60 * 60 * 1000;
         this.record.sessions = [...this.record.sessions.filter(session => session.expiresAt > Date.now()).slice(-7), { hash: await digest(token), expiresAt }];
         await this.ctx.storage.put("account", this.record);
-        return reply({ accountId: this.record.accountId, displayName: this.record.displayName, token, expiresAt, mode: "demo" });
+        return reply({ accountId: this.record.accountId, displayName: this.record.displayName, token, expiresAt, mode: this.record.mode ?? "demo" });
       }
       const token = request.headers.get("X-Account-Token") ?? "";
       const hash = await digest(token);

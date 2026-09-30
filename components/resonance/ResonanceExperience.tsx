@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Compass, Footprints } from "lucide-react";
+import { Compass, Footprints, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { InteractionGlyph } from "@/components/resonance/ReactionDock";
@@ -9,6 +9,7 @@ import { MockHostPanel } from "@/components/resonance/HostStatus";
 import { JourneySummary, type JourneyTab } from "@/components/resonance/JourneySummary";
 import { NearbyRadar } from "@/components/resonance/OnlineNearbyPanel";
 import { DemoRoomSession } from "@/components/resonance/DemoRoomSession";
+import { LocationMusic } from "@/components/resonance/LocationMusic";
 import { useResonanceWebTools } from "@/hooks/useResonanceWebTools";
 import { useResonancePlayer, type ResonancePlayer } from "@/hooks/useResonancePlayer";
 import { useAccountLibrary } from "@/hooks/useAccountLibrary";
@@ -36,7 +37,7 @@ function showReplyToast(reply: DemoReply, ids?: Set<string | number>) {
   });
 }
 
-type ExperienceProps = { roomView?: ((player: ResonancePlayer) => ReactNode) | null; playbackHeader?: (player: ResonancePlayer) => ReactNode; onTrackChange?: (trackId: string) => void; onlinePanel: ReactNode | ((player: ResonancePlayer) => ReactNode); onlineActive: boolean; onPauseOnline: () => void; initialSource: "demo" | "online" };
+type ExperienceProps = { roomView?: ((player: ResonancePlayer) => ReactNode) | null; playbackHeader?: (player: ResonancePlayer) => ReactNode; currentTrackId?: string | null; onTrackChange?: (trackId: string) => void; onlinePanel: ReactNode | ((player: ResonancePlayer) => ReactNode); onlineActive: boolean; onPauseOnline: () => void; initialSource: "demo" | "online"; modeSwitchDisabled?: boolean };
 export function ResonanceExperience(props: ExperienceProps) {
   return playableListeners.length ? <PopulatedExperience {...props} /> : <EmptyPlaylistExperience />;
 }
@@ -47,7 +48,7 @@ function EmptyPlaylistExperience() {
   useDemoReplies(reply => showReplyToast(reply, notices.current));
   return <section className="empty-playlist"><h2>歌单还没有歌曲</h2><p>添加歌曲后即可开始，收藏和足迹仍在</p><JourneySummary received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><MockHostPanel /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
 }
-function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePanel, onlineActive, onPauseOnline, initialSource }: ExperienceProps) {
+function PopulatedExperience({ roomView, playbackHeader, currentTrackId, onTrackChange, onlinePanel, onlineActive, onPauseOnline, initialSource, modeSwitchDisabled = false }: ExperienceProps) {
   const { library, dispatch, onlineHistory, onlineExchanges, received, markExchangeRead, unreadCount } = useAccountLibrary();
   const [view, setView] = useState<AppView>("radar");
   const [journeyTab, setJourneyTab] = useState<JourneyTab>("history");
@@ -62,10 +63,16 @@ function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePa
   const { reaction, sendReaction } = useDemoReplies(reply => showReplyToast(reply, replyToasts.current));
 
   const inRoom = !!roomView;
+  function selectSource(source: "demo" | "online") {
+    if (inRoom || demoPeer || modeSwitchDisabled) return;
+    if (source === "demo") { onPauseOnline(); setVisible(true); }
+    setRadarSource(source); setView("radar");
+  }
   // 在点击里直接开播，保住浏览器的播放许可；和真人一样，跟上后就进一起听。
   function followDemo(peer: NearbyPeer) {
     const track = audioTracks.find(item => item.id === peer.trackId);
-    if (inRoom || !track?.available) return false;
+    if (inRoom || demoPeer || modeSwitchDisabled || !track?.available) return false;
+    if (onlineActive) onPauseOnline();
     onTrackChange?.(track.id);
     void player.playTrack(track);
     setRadarSource("demo"); setView("radar"); setDemoPeer(peer);
@@ -102,20 +109,21 @@ function PopulatedExperience({ roomView, playbackHeader, onTrackChange, onlinePa
     <section className="integrated-experience">
       <audio ref={audioRef} preload="metadata" hidden />
       <section className="phone-stage" aria-label="同频音乐体验">
-        {!inSession && <nav className="bottom-nav" aria-label="主要导航"><button type="button" data-active={view === "radar"} aria-current={view === "radar" ? "page" : undefined} onClick={() => setView("radar")}><Compass aria-hidden="true" /><span>附近</span></button><button type="button" data-active={view === "journey"} aria-current={view === "journey" ? "page" : undefined} aria-label={unreadCount ? `足迹与收藏，${unreadCount} 首送你的歌未读` : "足迹与收藏"} onClick={() => { setJourneyTab("history"); setView("journey"); }}><Footprints aria-hidden="true" /><span>足迹与收藏{unreadCount > 0 && <b className="unread-count" aria-hidden="true">{unreadCount}</b>}</span></button></nav>}
+        {!inSession && <nav className="bottom-nav" aria-label="主要导航"><button type="button" data-active={view === "radar"} aria-current={view === "radar" ? "page" : undefined} onClick={() => setView("radar")}><Compass aria-hidden="true" /><span>附近</span></button><button type="button" data-active={view === "bottles"} aria-current={view === "bottles" ? "page" : undefined} onClick={() => setView("bottles")}><MapPin aria-hidden="true" /><span>地点留声</span></button><button type="button" data-active={view === "journey"} aria-current={view === "journey" ? "page" : undefined} aria-label={unreadCount ? `足迹与收藏，${unreadCount} 首送你的歌未读` : "足迹与收藏"} onClick={() => { setJourneyTab("history"); setView("journey"); }}><Footprints aria-hidden="true" /><span>足迹与收藏{unreadCount > 0 && <b className="unread-count" aria-hidden="true">{unreadCount}</b>}</span></button></nav>}
         {!inSession && onlineActive && !(view === "radar" && radarSource === "online") && <div className="integrated-presence"><span>你正对附近可见</span><button type="button" onClick={onPauseOnline}>隐身</button></div>}
         <div className="phone-stage__content" ref={contentRef}>
           {roomView?.(player)}
           {!inRoom && demoPeer && <DemoRoomSession key={demoPeer.id} peer={demoPeer} player={player} onExit={() => { setDemoPeer(null); setView("radar"); }} onTrack={onTrackChange} reaction={reaction} onReact={(kind, trackId) => void sendReaction(kind, trackId)} onGift={trackId => giftDemo(demoPeer, trackId)} />}
           {!inSession && <>
+          {view === "bottles" && <LocationMusic experience={radarSource} currentTrackId={player.track?.id ?? currentTrackId} onPlayTrack={playSavedTrack} onPauseMusic={player.pause} />}
           {view === "radar" && radarSource === "online" && (typeof onlinePanel === "function" ? onlinePanel(player) : onlinePanel)}
-          {view === "radar" && radarSource === "demo" && <NearbyRadar peers={visible ? demoPeers : []} visible={visible} ready online busy={false} currentTrackId={player.track?.id ?? audioTracks[0]?.id ?? null} player={player} switchDisabled={false} onVisibleChange={() => setVisible(value => !value)} onFollow={peer => void followDemo(peer)} />}
+          {view === "radar" && radarSource === "demo" && <NearbyRadar peers={visible ? demoPeers : []} visible={visible} ready online busy={false} currentTrackId={player.track?.id ?? currentTrackId ?? audioTracks[0]?.id ?? null} player={player} switchDisabled={false} onVisibleChange={() => setVisible(value => !value)} onFollow={peer => void followDemo(peer)} />}
           {view === "journey" && <JourneySummary key={journeyTab} initialTab={journeyTab} onTabChange={setJourneyTab} received={received} onReadExchange={markExchangeRead} accountBacked onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} library={library} onPlayTrack={playSavedTrack} onRemoveFavorite={trackId => dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => dispatch({ type: "removeLater", trackId })} onReturn={() => setView("radar")} />}
           </>}
         </div>
       </section>
       {!demoPeer && playbackHeader?.(player)}
-      <MockHostPanel><label>听众来源<select aria-label="调试听众来源" value={radarSource} onChange={event => { setRadarSource(event.target.value as "demo" | "online"); setView("radar"); }}><option value="demo">模拟听众 · 自动回应</option><option value="online">真实客户端 · 双人联调</option></select></label></MockHostPanel>
+      <MockHostPanel><label>听众来源<select aria-label="调试听众来源" value={radarSource} disabled={inSession || modeSwitchDisabled} onChange={event => selectSource(event.target.value as "demo" | "online")}><option value="demo">模拟听众 · 自动回应</option><option value="online">真实客户端 · 双人联调</option></select></label></MockHostPanel>
       <Toaster position="bottom-right" containerAriaLabel="回应通知" closeButton duration={8000} visibleToasts={2} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} />
     </section>
   );

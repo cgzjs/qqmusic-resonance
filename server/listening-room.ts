@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { audioTracks } from "../lib/resonance/demo-data";
 import { catalogVersion, findCatalogTrack } from "../lib/resonance/catalog";
+import { accountObjectName, type AccountScope } from "./account-scope";
 import { deliverExchange, sendGift, type ExchangeCommand, type ExchangeOutbox } from "../lib/resonance/exchange-protocol";
 import { REACTION_COOLDOWN_MS, REACTION_TTL_MS, type RoomReaction } from "../lib/resonance/room-protocol";
 import { applyRoomCommand, HEARTBEAT_TIMEOUT_MS, isRoomExchange, parseRoomMessage, playbackPosition, settledPlayback, RECONNECT_GRACE_MS, ROOM_LIFETIME_MS, type RoomRole, type RoomSnapshot } from "../lib/resonance/room-protocol";
@@ -12,6 +13,7 @@ type RoomRecord = Omit<RoomSnapshot, "hostConnected" | "guestConnected"> & {
   guestToken: string;
   nearby?: boolean;
   accounts?: Record<RoomRole, string>;
+  accountScope?: AccountScope;
   slots: Record<RoomRole, PeerSlot>;
   commands: Record<RoomRole, string[]>;
   reactions?: { event: RoomReaction; recipientClientId: string; received: boolean }[];
@@ -116,7 +118,7 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
     this.flushingExchanges = true;
     try {
       const delivered = await Promise.all(due.map(item => deliverExchange(item, room.id, Date.now(), async (accountId, record) => {
-        const response = await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName(accountId)).fetch(new Request("https://account.internal/record-exchange", { method: "POST", body: JSON.stringify({ accountId, record }), signal: AbortSignal.timeout(5000) }));
+        const response = await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName(accountObjectName(accountId, room.accountScope))).fetch(new Request("https://account.internal/record-exchange", { method: "POST", body: JSON.stringify({ accountId, record }), signal: AbortSignal.timeout(5000) }));
         return response.ok;
       })));
       if (this.room !== room) return;
@@ -155,6 +157,16 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
 
   async fetch(request: Request): Promise<Response> {
     // Internal-only route: never forwarded by the public worker router.
+    if (new URL(request.url).pathname === "/decline" && request.method === "POST") {
+      return this.ctx.blockConcurrencyWhile(async () => {
+        const { host, guest } = await request.json<{ host: string; guest: string }>();
+        if (!this.room || this.room.closed) return Response.json({ ok: true });
+        if (this.room.accounts?.host !== host || this.room.accounts?.guest !== guest) return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+        if (!this.room.nearby || this.room.slots.host.clientId) return Response.json({ error: "UNAVAILABLE" }, { status: 409 });
+        await this.closeRoom();
+        return Response.json({ ok: true });
+      });
+    }
     if (new URL(request.url).pathname === "/close-for-block" && request.method === "POST") {
       return this.ctx.blockConcurrencyWhile(async () => {
         const { host, guest } = await request.json<{ host: string; guest: string }>();
@@ -166,12 +178,13 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
     }
     if (new URL(request.url).pathname === "/init" && request.method === "POST") {
       if (this.room) return Response.json({ error: "ROOM_EXISTS" }, { status: 409 });
-      const { id, trackId, nearby, accounts } = await request.json<{ id: string; trackId: string; nearby?: boolean; accounts?: Record<RoomRole, string> }>();
+      const { id, trackId, nearby, accounts, accountScope } = await request.json<{ id: string; trackId: string; nearby?: boolean; accounts?: Record<RoomRole, string>; accountScope?: AccountScope }>();
       const now = Date.now();
       this.room = { id, revision: 0, expiresAt: now + ROOM_LIFETIME_MS, closed: false, playback: { trackId, position: 0, playing: false, updatedAt: now }, hostToken: crypto.randomUUID(), guestToken: crypto.randomUUID(), slots: { host: { clientId: null, disconnectedAt: now }, guest: { clientId: null, disconnectedAt: null } }, commands: { host: [], guest: [] } };
       this.room.nearby = nearby === true;
       this.room.catalogVersion = catalogVersion;
       this.room.accounts = accounts;
+      this.room.accountScope = accountScope === "preview" ? "preview" : "demo";
       await this.persist();
       return Response.json({ roomId: id, hostToken: this.room.hostToken, ...(nearby ? { guestToken: this.room.guestToken } : {}), expiresAt: this.room.expiresAt }, { status: 201, headers: { "Cache-Control": "no-store" } });
     }
@@ -199,7 +212,7 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
       const role = data.role ?? (message.type === "hello" ? message.token === this.room.hostToken ? "host" : message.token === this.room.guestToken ? "guest" : null : null);
       const accountToken = message.type === "hello" ? message.accountToken : data.accountToken;
       if (!role || !accountToken) { socket.close(4001, "AUTH_REQUIRED"); return; }
-      const authorized = await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName(this.room.accounts[role])).fetch(new Request("https://account.internal/auth", { headers: { "X-Account-Token": accountToken } }));
+      const authorized = await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName(accountObjectName(this.room.accounts[role], this.room.accountScope))).fetch(new Request("https://account.internal/auth", { headers: { "X-Account-Token": accountToken } }));
       if (this.room !== roomBeforeAuth || !this.room) return;
       if (!authorized.ok) { await this.closeRoom(); return; }
       if (socket.readyState !== 1) return;
@@ -235,7 +248,7 @@ export class ListeningRoom extends DurableObject<Cloudflare.Env> {
       const other = this.peers(otherRole)[0];
       if (this.room.accounts && other) {
         const before = this.room;
-        const valid = await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName(before.accounts![otherRole])).fetch(new Request("https://account.internal/auth", { headers: { "X-Account-Token": this.attachment(other)?.accountToken ?? "" } }));
+        const valid = await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName(accountObjectName(before.accounts![otherRole], before.accountScope))).fetch(new Request("https://account.internal/auth", { headers: { "X-Account-Token": this.attachment(other)?.accountToken ?? "" } }));
         if (this.room !== before || !this.room || this.room.closed || socket.readyState !== 1) return;
         if (!valid.ok) { await this.closeRoom(); return; }
       }
