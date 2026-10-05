@@ -5,7 +5,6 @@ import { Compass, Footprints, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { InteractionGlyph } from "@/components/resonance/ReactionDock";
-import { MockHostPanel } from "@/components/resonance/HostStatus";
 import { JourneySummary, type JourneyTab } from "@/components/resonance/JourneySummary";
 import { NearbyRadar } from "@/components/resonance/OnlineNearbyPanel";
 import { DemoRoomSession } from "@/components/resonance/DemoRoomSession";
@@ -46,7 +45,7 @@ function EmptyPlaylistExperience() {
   const notices = useRef(new Set<string | number>());
   useEffect(() => () => { for (const id of notices.current) toast.dismiss(id); }, []);
   useDemoReplies(reply => showReplyToast(reply, notices.current));
-  return <section className="empty-playlist"><h2>歌单还没有歌曲</h2><p>添加歌曲后即可开始，收藏和足迹仍在</p><JourneySummary received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><MockHostPanel /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
+  return <section className="empty-playlist"><h2>歌单暂时不可用</h2><p>稍后再来听，收藏和足迹仍在</p><JourneySummary received={received} onReadExchange={markExchangeRead} accountBacked library={library} onlineHistory={onlineHistory} onlineExchanges={onlineExchanges} onPlayTrack={() => {}} onRemoveFavorite={trackId => void dispatch({ type: "removeFavorite", trackId })} onRemoveLater={trackId => void dispatch({ type: "removeLater", trackId })} /><Toaster position="bottom-right" closeButton duration={8000} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} /></section>;
 }
 function PopulatedExperience({ roomView, playbackHeader, currentTrackId, onTrackChange, onlinePanel, onlineActive, onPauseOnline, initialSource, modeSwitchDisabled = false }: ExperienceProps) {
   const { library, dispatch, onlineHistory, onlineExchanges, received, markExchangeRead, unreadCount } = useAccountLibrary();
@@ -63,11 +62,6 @@ function PopulatedExperience({ roomView, playbackHeader, currentTrackId, onTrack
   const { reaction, sendReaction } = useDemoReplies(reply => showReplyToast(reply, replyToasts.current));
 
   const inRoom = !!roomView;
-  function selectSource(source: "demo" | "online") {
-    if (inRoom || demoPeer || modeSwitchDisabled) return;
-    if (source === "demo") { onPauseOnline(); setVisible(true); }
-    setRadarSource(source); setView("radar");
-  }
   // 在点击里直接开播，保住浏览器的播放许可；和真人一样，跟上后就进一起听。
   function followDemo(peer: NearbyPeer) {
     const track = audioTracks.find(item => item.id === peer.trackId);
@@ -123,7 +117,6 @@ function PopulatedExperience({ roomView, playbackHeader, currentTrackId, onTrack
         </div>
       </section>
       {!demoPeer && playbackHeader?.(player)}
-      <MockHostPanel><label>听众来源<select aria-label="调试听众来源" value={radarSource} disabled={inSession || modeSwitchDisabled} onChange={event => selectSource(event.target.value as "demo" | "online")}><option value="demo">模拟听众 · 自动回应</option><option value="online">真实客户端 · 双人联调</option></select></label></MockHostPanel>
       <Toaster position="bottom-right" containerAriaLabel="回应通知" closeButton duration={8000} visibleToasts={2} toastOptions={{ className: "demo-reply-toast", closeButtonAriaLabel: "关闭回应提示" }} />
     </section>
   );

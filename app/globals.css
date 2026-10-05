@@ -656,13 +656,6 @@ fieldset.song-list { margin: 0; padding: 0; border: 0; }
 .plugin-current h2 { font-weight: 550; font-size: 21px; margin: 8px 0 6px; }
 .plugin-current p { color: #a4b8ae; font-size: 13px; line-height: 1.7; }
 .plugin-heart { display: grid; place-items: center; width: 44px; min-height: 44px; flex-shrink: 0; margin-left: auto; color: #6feee1; }
-.plugin-debug { padding: 18px 32px; border-top: 1px solid #354340; color: #a4b8ae; font-size: 12px; }
-.plugin-debug summary { cursor: pointer; min-height: 44px; align-content: center; }
-.plugin-debug p { line-height: 1.8; margin: 8px 0 16px; }
-.plugin-debug > div { display: flex; flex-wrap: wrap; gap: 16px; }
-.plugin-debug label { display: grid; gap: 8px; flex: 1; min-width: 140px; }
-.plugin-debug select { min-height: 44px; background: #111817; color: #e5e2e3; padding: 8px; border: 1px solid #56746d; border-radius: 5px; width: 100%; }
-.plugin-debug-actions { margin-top: 16px; }
 .plugin-host-status { display: grid; justify-items: center; gap: 20px; text-align: center; padding: 64px 24px; }
 .plugin-host-status svg { color: #6feee1; }
 .plugin-host-status h2 { font-size: 24px; }
@@ -671,7 +664,7 @@ fieldset.song-list { margin: 0; padding: 0; border: 0; }
 .plugin-library > h2 { font-size: 17px; margin: 28px 0 12px; font-weight: 500; }
 .plugin-history { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid #354340; font-size: 14px; }
 .plugin-history time { color: #a4b8ae; font-size: 12px; }
-@media (max-width: 520px) { .plugin-current { padding: 14px; gap: 12px; } .plugin-current h2 { font-size: 18px; } .plugin-current small { font-size: 11px; } .plugin-debug { padding-inline: 18px; }.plugin-current .album-tile { width: 52px; height: 52px; flex-shrink: 0; } }
+@media (max-width: 520px) { .plugin-current { padding: 14px; gap: 12px; } .plugin-current h2 { font-size: 18px; } .plugin-current small { font-size: 11px; } .plugin-current .album-tile { width: 52px; height: 52px; flex-shrink: 0; } }
 .invite-listening-link { display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 12px; border: 1px solid #6feee133; border-radius: 8px; color: #6feee1; font-size: 13px; text-decoration: none; }
 .invite-listening-link:hover { background: #6feee10d; }
 .room-page { min-height: 100svh; padding: 32px 20px; background: #111314; color: #e5e2e3; }

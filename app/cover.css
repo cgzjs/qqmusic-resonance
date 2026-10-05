@@ -101,15 +101,20 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-icon-btn:hover:not(:disabled) { color: var(--cover-ink); background: var(--cover-wash); }
 .tp-icon-btn:disabled { opacity: .45; cursor: default; }
 .tp-app .tp-account { margin-left: 0; }
-.tp-app .tp-account summary { justify-content: center; width: 44px; min-height: 44px; border-radius: 999px; }
+.tp-app .tp-account > summary { justify-content: center; width: 44px; min-height: 44px; border-radius: 999px; }
 .tp-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--cover-line); color: var(--cover-ink); font-size: 13px; font-weight: 700; }
-/* 调试面板“设置”入口排在外观按钮左侧：12 + 44 + 4 + 44 + 4 */
-.tp-app[data-authenticated="true"] .plugin-debug:not([open]) { top: calc(6px + env(safe-area-inset-top)); right: 108px; }
-.tp-app .plugin-debug[open] { top: 60px; right: 12px; width: min(360px, calc(100% - 24px)); background: var(--cover-raised); }
-.tp-app[data-authenticated="false"] .plugin-debug[open] { background: var(--cover-surface); }
-.tp-login-experience { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--cover-line); }
-.tp-login-experience > .tp-btn { width: 100%; }
-.tp-login-experience > p { margin: 8px 0 0; color: var(--cover-ink-2); font-size: 12px; line-height: 1.6; text-align: center; }
+
+.tp-login-start { width: 100%; min-height: 54px; margin-top: 24px; gap: 10px; font-size: 15px; }
+.tp-login-start > span { flex: 1; text-align: left; }
+.tp-app .account-login-note { margin-top: 12px; color: var(--cover-ink-2); font-size: 12px; line-height: 1.7; }
+.tp-app .tp-account .tp-experience-settings { grid-template-columns: minmax(0, 1fr); justify-content: stretch; width: min(260px, calc(100vw - 40px)); max-height: min(480px, calc(100dvh - 88px)); overflow-y: auto; padding: 12px; border-color: var(--cover-line); background: var(--cover-raised); }
+.tp-experience-settings :is(button, a, summary) { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-height: 44px; color: var(--cover-ink); font-size: 13px; text-decoration: none; }
+.tp-experience-settings .tp-about > summary { list-style: none; }
+.tp-experience-settings .tp-about > summary::-webkit-details-marker { display: none; }
+.tp-experience-settings .tp-about p { margin: 4px 0 8px; color: var(--cover-ink-2); font-size: 12px; line-height: 1.6; }
+.tp-experience-settings .tp-about a { color: var(--cover-ink-2); font-size: 12px; line-height: 1.5; }
+.tp-experience-settings > button { width: 100%; margin-top: 4px; border-top: 1px solid var(--cover-line); }
+.tp-experience-settings > [role="alert"] { padding: 8px; font-size: 12px; line-height: 1.6; }
 
 /* 顶部标签：附近 / 足迹与收藏 */
 .tp-app .integrated-experience .phone-stage { background: none; }
@@ -347,8 +352,6 @@ html[data-theme="light"] .cover-scope { --cover-danger: #a8321f; }
 .tp-footnote { margin: 24px 0 0; color: var(--cover-ink-3); font-size: 12px; text-align: center; }
 
 /* ============ 听歌房 ============ */
-/* 顶栏只剩外观按钮，设置入口紧挨它：12 + 44 + 4 */
-.tp-room[data-authenticated="true"] .plugin-debug:not([open]) { right: 60px; }
 .tp-room-top { gap: 8px; padding-left: 4px; }
 .tp-room-title { display: grid; flex: 1; min-width: 0; }
 .tp-room-title h1 { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.3; }

@@ -28,7 +28,7 @@ async function restore(force = false): Promise<HostSnapshot> {
   try {
     const config = await (await hostFetch("config", null)).json() as { demo: boolean; preview?: boolean };
     if (run !== generation) return state;
-    if (!config.demo && !config.preview) return emit({ status: "unavailable", session: null, trackId: null, error: "请在 QQ 音乐里打开同频。" });
+    if (!config.demo && !config.preview) return emit({ status: "unavailable", session: null, trackId: null, error: "体验暂时不可用，请稍后重试。" });
     profile = config.preview ? "preview" : "demo";
     const selected = sessionStorage.getItem(slotKey());
     if (selected !== "A" && selected !== "B") return emit({ status: "signed-out", session: null, trackId: null, error: null });

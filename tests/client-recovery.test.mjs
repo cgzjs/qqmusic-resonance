@@ -464,21 +464,40 @@ test("demo listeners share the nearby and room screens; a gift is one-way and la
   assert.equal(total.querySelector("strong").textContent, "1");
 });
 
-test("login owns the experience choice and normal A/B login switches back to online mode", async () => {
+test("public entry starts one demo, prevents duplicate starts and exposes no development controls", async () => {
   recoveryTest.host = { status: "signed-out", session: null };
   const choices = [];
   await act(async () => root.render(React.createElement(HostStatus, { onSelectSource: source => choices.push(source) })));
-  const experience = [...document.querySelectorAll("button")].find(button => button.textContent === "单人体验");
-  assert.ok(experience); assert.match(document.body.textContent, /模拟听众自动回应/);
+  const experience = [...document.querySelectorAll("button")].find(button => button.textContent === "开始体验");
+  assert.ok(experience); assert.match(document.body.textContent, /听众与地点为示例/);
+  assert.equal(document.querySelectorAll("button").length, 1);
+  assert.equal(document.querySelector("select"), null);
+  assert.doesNotMatch(document.body.textContent, /双页测试|双人联调|模拟宿主|选择你的身份/);
   let finish;
   recoveryTest.loginResult = new Promise(resolve => { finish = resolve; });
   await act(async () => experience.click());
   assert.deepEqual(choices, ["demo"]); assert.deepEqual(recoveryTest.logins, ["A"]);
   assert.ok([...document.querySelectorAll("button")].every(button => button.disabled));
+  await act(async () => experience.click());
+  assert.deepEqual(recoveryTest.logins, ["A"]);
   await act(async () => finish({ status: "ready" }));
+  assert.equal(experience.disabled, false);
+  assert.equal(document.querySelector('[aria-label="登录听众 B"]'), null);
+});
+
+test("expired demo entry reports a failed start and remains available for retry", async () => {
+  recoveryTest.host = { status: "expired", session: null };
+  recoveryTest.loginResult = { status: "unavailable", error: "连接暂时不可用" };
+  await act(async () => root.render(React.createElement(HostStatus)));
+  const start = [...document.querySelectorAll("button")].find(button => button.textContent === "重新体验");
+  assert.ok(start); assert.match(document.body.textContent, /体验已过期/);
+  await act(async () => start.click());
+  assert.equal(document.querySelector('[role="alert"]').textContent, "连接暂时不可用");
+  assert.equal(start.disabled, false);
   recoveryTest.loginResult = { status: "ready" };
-  await act(async () => document.querySelector('button[aria-label="登录听众 B"]').click());
-  assert.deepEqual(choices, ["demo", "online"]); assert.deepEqual(recoveryTest.logins, ["A", "B"]);
+  await act(async () => start.click());
+  assert.equal(document.querySelector('[role="alert"]'), null);
+  assert.deepEqual(recoveryTest.logins, ["A", "A"]);
 });
 
 test("received list does not mark on mount; opening unavailable songs supports read failure and retry", async () => {

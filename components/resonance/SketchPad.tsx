@@ -4,10 +4,12 @@ import { Brush, Eraser, Highlighter, PenLine, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type Props = { disabled?: boolean; value: string; onChange: (value: string) => void };
+const PAPER_COLOR = "#f4efe3";
 
 export function SketchPad({ disabled = false, value, onChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  const lastPainted = useRef<string | null>(null);
   const hasDrawing = !!value;
   const history = useRef<string[]>(value ? [value] : []);
   const [color, setColor] = useState("#263b47");
@@ -16,18 +18,26 @@ export function SketchPad({ disabled = false, value, onChange }: Props) {
   const colors = ["#263b47", "#d0634d", "#d89b3f", "#4e8b78", "#627bb2", "#9c6fae"];
   const widths = [{ label: "细", value: 7 }, { label: "中", value: 14 }, { label: "粗", value: 25 }];
   function paper(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
-    context.save(); context.globalCompositeOperation = "source-over"; context.fillStyle = "#f4efe3"; context.fillRect(0, 0, canvas.width, canvas.height); context.restore();
+    context.save(); context.globalCompositeOperation = "source-over"; context.globalAlpha = 1; context.fillStyle = PAPER_COLOR; context.fillRect(0, 0, canvas.width, canvas.height); context.restore();
   }
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const context = canvas.getContext("2d");
     if (!context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height); paper(context, canvas);
-    if (!value) return;
+    if (lastPainted.current === value) return;
+    if (!value) { context.clearRect(0, 0, canvas.width, canvas.height); paper(context, canvas); lastPainted.current = ""; return; }
+    let active = true;
     const image = new Image();
-    image.onload = () => { context.drawImage(image, 0, 0, canvas.width, canvas.height); };
+    image.onload = () => {
+      if (!active) return;
+      context.save(); context.globalCompositeOperation = "source-over"; context.globalAlpha = 1;
+      context.clearRect(0, 0, canvas.width, canvas.height); paper(context, canvas);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height); context.restore();
+      lastPainted.current = value;
+    };
     image.src = value;
+    return () => { active = false; };
   }, [value]);
   function point(event: React.PointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current!;
@@ -39,7 +49,7 @@ export function SketchPad({ disabled = false, value, onChange }: Props) {
     event.currentTarget.setPointerCapture(event.pointerId);
     const context = canvasRef.current?.getContext("2d");
     if (!context) return;
-    const p = point(event); context.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over"; context.strokeStyle = tool === "eraser" ? "rgba(0,0,0,1)" : color; context.globalAlpha = tool === "marker" ? .42 : 1; context.lineWidth = tool === "marker" ? Math.max(width, 22) : width; context.beginPath(); context.moveTo(p.x, p.y); drawing.current = true;
+    const p = point(event); context.globalCompositeOperation = "source-over"; context.strokeStyle = tool === "eraser" ? PAPER_COLOR : color; context.globalAlpha = tool === "marker" ? .42 : 1; context.lineWidth = tool === "marker" ? Math.max(width, 22) : width; context.beginPath(); context.moveTo(p.x, p.y); drawing.current = true;
   }
   function move(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!drawing.current || disabled) return;
@@ -51,18 +61,18 @@ export function SketchPad({ disabled = false, value, onChange }: Props) {
     if (!drawing.current) return;
     drawing.current = false;
     const canvas = canvasRef.current;
-    if (canvas) { const snapshot = canvas.toDataURL("image/jpeg", .82); history.current = [...history.current.slice(-7), snapshot]; onChange(snapshot); }
+    if (canvas) { const snapshot = canvas.toDataURL("image/jpeg", .82); lastPainted.current = snapshot; history.current = [...history.current.slice(-7), snapshot]; onChange(snapshot); }
   }
   function clear() {
     if (disabled) return;
     const canvas = canvasRef.current, context = canvas?.getContext("2d");
     if (!canvas || !context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height); paper(context, canvas); history.current = []; onChange("");
+    context.clearRect(0, 0, canvas.width, canvas.height); paper(context, canvas); lastPainted.current = ""; history.current = []; onChange("");
   }
   function undo() {
     if (disabled || !history.current.length) return;
     history.current = history.current.slice(0, -1); const previous = history.current.at(-1) ?? ""; onChange(previous);
-    if (!previous) { const canvas = canvasRef.current, context = canvas?.getContext("2d"); if (canvas && context) { context.clearRect(0, 0, canvas.width, canvas.height); paper(context, canvas); } }
+    if (!previous) { const canvas = canvasRef.current, context = canvas?.getContext("2d"); if (canvas && context) { context.clearRect(0, 0, canvas.width, canvas.height); paper(context, canvas); lastPainted.current = ""; } }
   }
   useEffect(() => {
     const context = canvasRef.current?.getContext("2d");
