@@ -15,16 +15,16 @@ export async function setupExchangeRoom(base, trackIds = ["demo-night", "demo-gl
   return { hostAccount: b, guestAccount: a, hostTicket: hosting.ticket, guestTicket: followed.ticket };
 }
 export class ExchangePeer {
-  events = []; latest = null; nextIndex = 0;
+  events = []; latest = null; nextIndex = 0; serverOffset = 0;
   constructor(base, ticket, account, clientId = crypto.randomUUID()) {
     this.clientId = clientId;
     this.socket = new WebSocket(`${base.replace(/^http/, "ws")}/api/rooms/${ticket.roomId}/socket`);
-    this.socket.addEventListener("message", event => { const message = JSON.parse(event.data); this.events.push(message); if (message.room) this.latest = message.room; });
+    this.socket.addEventListener("message", event => { const message = JSON.parse(event.data); this.events.push(message); if (message.room) this.latest = message.room; if (Number.isFinite(message.serverTime)) this.serverOffset = message.serverTime - Date.now(); });
     this.socket.addEventListener("open", () => this.send({ type: "hello", token: ticket.token, clientId, accountToken: account.session.token }));
     this.heartbeat = setInterval(() => { if (this.socket.readyState === WebSocket.OPEN) this.send({ type: "ping", sentAt: Date.now() }); }, 4000);
   }
   send(value) { this.socket.send(JSON.stringify(value)); }
-  command(action, values = {}) { const message = { type: "exchange", id: crypto.randomUUID(), action, sentAt: Date.now(), ...values }; this.send(message); return message; }
+  command(action, values = {}) { const message = { type: "exchange", id: crypto.randomUUID(), action, sentAt: Date.now() + this.serverOffset, ...values }; this.send(message); return message; }
   async wait(predicate, timeout = 8000) {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {

@@ -13,6 +13,12 @@ process.env.WRANGLER_REGISTRY_PATH ||= path.join(runtimeRoot, "wrangler/dev-regi
 process.env.MINIFLARE_REGISTRY_PATH ||= path.join(runtimeRoot, "wrangler/registry");
 
 process.chdir(projectRoot);
+// Wrangler resolves runtime env files against the config directory. Keep the
+// root configuration available when the generated config lives in dist/server.
+const envFileArgument = process.argv.indexOf("--env-file");
+if (envFileArgument !== -1 && process.argv[envFileArgument + 1] && !process.argv[envFileArgument + 1].startsWith("--")) {
+  process.argv[envFileArgument + 1] = path.resolve(projectRoot, process.argv[envFileArgument + 1]);
+}
 for (const directory of [
   path.dirname(process.env.WRANGLER_LOG_PATH),
   process.env.WRANGLER_REGISTRY_PATH,

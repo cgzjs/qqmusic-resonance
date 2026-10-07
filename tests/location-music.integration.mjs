@@ -10,7 +10,10 @@ test('visitors share one place across sessions, replay safely, keep other places
   const note = { id: crypto.randomUUID(), trackId: catalog.tracks[0].id, title: '路过的人', message: '这首歌留在同一个地方，后来的人也能听到。' };
   const secondNote = { ...note, id: crypto.randomUUID(), trackId: catalog.tracks[1].id, title: '另一个人的歌', message: '同一个公园，不同人的音乐。' };
   try {
-    assert.equal((await call(a, 'leave', note)).status, 200);
+    const published = await call(a, 'leave', note);
+    assert.equal(published.status, 200);
+    const publishedAt = (await published.json()).notes.find(item => item.id === note.id).createdAt;
+    assert.ok(Number.isFinite(publishedAt));
     assert.equal((await call(a, 'leave', note)).status, 200);
     assert.equal((await call(b, 'leave', secondNote)).status, 200);
     for (let repeat = 0; repeat < 2; repeat++) {
@@ -26,7 +29,8 @@ test('visitors share one place across sessions, replay safely, keep other places
     const far = await call(b, 'nearby', {}, { ...position(), longitude: 116 }); assert.deepEqual((await far.json()).notes, []);
     const demo = await call(a, 'nearby', {}, { ...position(), latitude: 28.214, longitude: 112.971 }, 'demo');
     assert.equal(demo.status, 200); assert.ok(!(await demo.json()).notes.some(item => item.id === note.id));
-    assert.equal((await call(b, 'nearby', {}, { ...position(), timestamp: Date.now() - 121000 })).status, 400);
+    // Use the server's saved timestamp so host clock skew cannot turn an expired sample into a fresh one.
+    assert.equal((await call(b, 'nearby', {}, { ...position(), timestamp: publishedAt - 121000 })).status, 400);
     assert.equal((await call(a, 'withdraw', { id: note.id })).status, 200);
     assert.deepEqual((await (await call(b, 'nearby')).json()).notes.map(item => item.id), [secondNote.id]);
   } finally {

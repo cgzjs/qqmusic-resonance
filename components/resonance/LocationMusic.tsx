@@ -13,19 +13,21 @@ import { AlbumTile } from "./AlbumTile";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { coverThemeStyle } from "@/lib/resonance/cover-theme";
 import { SketchPad } from "./SketchPad";
-import { startImageJob, subscribeImageJob, type ClientImageJobState } from "@/lib/resonance/image-job-client";
+import { readPlaceDraft, writePlaceDraft, resetImageJob, startImageJob, subscribeImageJob, type ClientImageJobState } from "@/lib/resonance/image-job-client";
 
 type Props = { experience: "demo" | "online"; currentTrackId?: string | null; onPlayTrack: (track: AudioTrack) => void; onPauseMusic: () => void };
 export function LocationMusic(props: Props) {
   const { session } = useHost();
-  return session ? <PlaceWall key={`${session.accountId}.${props.experience}`} {...props} session={session} /> : null;
+  return session ? <PlaceWall key={`${session.mode}.${session.accountId}.${props.experience}`} {...props} session={session} /> : null;
 }
 function PlaceWall({ session, experience, currentTrackId, onPlayTrack, onPauseMusic }: Props & { session: HostSession }) {
   const host = useHost(), wall = usePlaceMusic(session, experience);
-  const [trackId, setTrackId] = useState(currentTrackId ?? audioTracks[0]?.id ?? "");
-  const [title, setTitle] = useState("留给路过的你"), [message, setMessage] = useState("");
-  const [contentType, setContentType] = useState<PlaceContentType>("text");
-  const [drawingData, setDrawingData] = useState(""), [aiImageData, setAiImageData] = useState("");
+  const imageJobKey = `${session.mode}:${session.accountId}:${experience}`;
+  const [savedDraft] = useState(() => readPlaceDraft(imageJobKey));
+  const [trackId, setTrackId] = useState(savedDraft?.trackId ?? currentTrackId ?? audioTracks[0]?.id ?? "");
+  const [title, setTitle] = useState(savedDraft?.title ?? "留给路过的你"), [message, setMessage] = useState(savedDraft?.message ?? "");
+  const [contentType, setContentType] = useState<PlaceContentType>(savedDraft?.contentType ?? "text");
+  const [drawingData, setDrawingData] = useState(savedDraft?.drawingData ?? ""), [aiImageData, setAiImageData] = useState("");
   const [imageBusy, setImageBusy] = useState(false), [imageNotice, setImageNotice] = useState("");
   const [feedback, setFeedback] = useState(""), [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState<string | null>(null), [reading, setReading] = useState<string | null>(null);
@@ -43,8 +45,10 @@ function PlaceWall({ session, experience, currentTrackId, onPlayTrack, onPauseMu
   const disabled = wall.busy || !!wall.pending || !wall.ready;
   const placeName = wall.data.places.find(place => place.id === wall.data.placeId)?.name ?? "附近";
   const [postmark] = useState(() => { const today = new Date(); return `${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`; });
-  const imageJobKey = `${session.accountId}:${trackId}:${title.trim()}`;
   useEffect(() => () => { if (utterance.current) window.speechSynthesis?.cancel(); copyController.current?.abort(); copyController.current = null; }, []);
+  useEffect(() => {
+    writePlaceDraft(imageJobKey, { trackId, title, message, contentType, drawingData });
+  }, [imageJobKey, trackId, title, message, contentType, drawingData]);
   useEffect(() => subscribeImageJob(imageJobKey, (state: ClientImageJobState) => {
     setImageBusy(state.status === "running"); setAiImageData(state.imageUrl ?? ""); setImageNotice(state.notice ?? "");
   }), [imageJobKey]);
@@ -55,13 +59,9 @@ function PlaceWall({ session, experience, currentTrackId, onPlayTrack, onPauseMu
     cancelCopy(); setCopySuggestions([]); setCopyIndex(0); setCopyNotice("");
   }
   function chooseContentType(next: PlaceContentType) {
-    setContentType(next); setImageNotice("");
-    if (next !== "drawing") setDrawingData("");
-    if (next !== "ai") setAiImageData("");
-    if (next !== "text") { setMessage(""); resetCopy(); }
+    setContentType(next);
   }
-  function cancelImage() { /* Background image jobs intentionally continue across view changes. */ }
-  function resetContent() { cancelImage(); setContentType("text"); setDrawingData(""); setAiImageData(""); setImageNotice(""); }
+  function resetContent() { resetImageJob(imageJobKey); setContentType("text"); setDrawingData(""); setAiImageData(""); setImageNotice(""); }
   function stopReading() { if (utterance.current) window.speechSynthesis?.cancel(); utterance.current = null; setReading(null); }
   function read(note: PlaceNote) {
     setSaveError("");
@@ -121,13 +121,13 @@ function PlaceWall({ session, experience, currentTrackId, onPlayTrack, onPauseMu
         const type = response.headers.get("content-type") ?? "";
         if (!response.ok) {
           const result = await response.json().catch(() => ({})) as { error?: string };
-          const messages: Record<string, string> = { AI_AUTH_FAILED: "生图密钥无效，请检查服务配置", AI_BILLING_REQUIRED: "生图额度不足或未开通付费", AI_RATE_LIMIT: "生图服务繁忙，请稍后再试", AI_CONTENT_REJECTED: "内容安全审核未通过，请换个标题", AI_TIMEOUT: "生图等待超时，请重试", AI_UNAVAILABLE: "生图服务暂时不可用，请重试" };
+          const messages: Record<string, string> = { AI_NOT_CONFIGURED: "生图服务暂未开通，请稍后再试", AI_AUTH_FAILED: "生图服务暂时不可用，请稍后再试", AI_BILLING_REQUIRED: "生图服务暂时不可用，请稍后再试", AI_RATE_LIMIT: "生图服务繁忙，请稍后再试", AI_CONTENT_REJECTED: "内容安全审核未通过，请换个标题", AI_TIMEOUT: "生图等待超时，请重试", AI_UNAVAILABLE: "生图服务暂时不可用，请重试", IMAGE_COOLDOWN: "刚画过一张，稍等片刻再试", IMAGE_HOURLY_LIMIT: "本小时生成次数已达上限，稍后再试" };
           throw new Error(messages[result.error ?? ""] ?? "生图失败，请重试");
         }
         if (type.startsWith("image/")) return { imageUrl: await compressImage(await response.blob()), notice: "AI 图已生成" };
         const result = await response.json() as { imageUrl?: string; source?: "ai" | "fallback" };
-        if (!result.imageUrl) throw new Error("AI 没有返回图片");
-        return { imageUrl: result.imageUrl, notice: result.source === "fallback" ? "已生成演示图（模型未配置）" : "AI 图已生成" };
+        if (!result.imageUrl || result.source !== "ai") throw new Error("没有生成新图片，请稍后再试");
+        return { imageUrl: result.imageUrl, notice: "AI 图已生成" };
       } finally { clearTimeout(timeout); }
     });
   }  function applyCopy(suggestion: PlaceCopySuggestion) {
@@ -163,7 +163,7 @@ function PlaceWall({ session, experience, currentTrackId, onPlayTrack, onPauseMu
               <label className="tp-track-picker">
                 <span className="tp-track-picker-caption">随信附上一首歌 · 换一首 <ChevronDown size={14} aria-hidden="true" /></span>
                 <strong>{selectedTrack?.track}</strong><span className="tp-track-picker-artist">{selectedTrack?.artist}</span>
-                <select aria-label="选一首歌" disabled={disabled} value={trackId} onChange={event => { setTrackId(event.target.value); resetCopy(); setImageNotice(""); }}>{audioTracks.map(track => <option key={track.id} value={track.id}>{track.track} · {track.artist}</option>)}</select>
+                <select aria-label="选一首歌" disabled={disabled || imageBusy} value={trackId} onChange={event => { setTrackId(event.target.value); resetCopy(); setImageNotice(""); }}>{audioTracks.map(track => <option key={track.id} value={track.id}>{track.track} · {track.artist}</option>)}</select>
               </label>
             </div>
             <div className="tp-pc-stamp" aria-hidden="true">
@@ -174,7 +174,7 @@ function PlaceWall({ session, experience, currentTrackId, onPlayTrack, onPauseMu
           <div className="tp-postcard-editor" data-preview={!!suggestion}>
             <div className="tp-content-picker" role="group" aria-label="留言形式">{([ ["text", "写一句", Type], ["drawing", "画一笔", PenLine], ["ai", "AI 配图", ImageIcon] ] as const).map(([type, label, Icon]) => <button key={type} type="button" aria-pressed={contentType === type} disabled={disabled || copyBusy || imageBusy} onClick={() => chooseContentType(type)}><Icon size={15} aria-hidden="true" />{label}</button>)}</div>
             <div className="tp-pc-sheet" data-mode={contentType}>
-              <label className="tp-postcard-title"><span className="tp-sr">留言标题</span><input ref={titleInput} id="place-message-title" required maxLength={40} disabled={disabled} value={title} onChange={event => setTitle(event.target.value)} placeholder="给这首歌一个名字" /></label>
+              <label className="tp-postcard-title"><span className="tp-sr">留言标题</span><input ref={titleInput} id="place-message-title" required maxLength={40} disabled={disabled || imageBusy} value={title} onChange={event => setTitle(event.target.value)} placeholder="给这首歌一个名字" /></label>
               {contentType === "text" && (suggestion ? <div className="tp-pc-note">
                 <div className="tp-inspiration-heading"><span>{copySource === "ai" ? "AI 递来一张便签" : "一张灵感便签"}</span><button type="button" disabled={disabled || copyBusy} onClick={resetCopy}>我自己写</button></div>
                 <div className="tp-inspiration-content" aria-live="polite" aria-atomic="true"><h3>{suggestion.title}</h3><p>{suggestion.message}</p></div>

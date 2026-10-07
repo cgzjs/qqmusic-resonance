@@ -9,10 +9,7 @@ import { AppearanceProvider } from "@/components/resonance/Appearance";
 
 export const metadata: Metadata = {
   title: "同频 · QQ音乐概念设计",
-  description: "在通勤途中，与附近的人匿名跟听、交换一首歌。",
-  other: {
-    "codex-preview": "development",
-  },
+  description: "发现附近的音乐，和此刻的人一起听，用文字、手绘或 AI 配图给后来的人留一首歌。",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

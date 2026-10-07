@@ -28,29 +28,48 @@ async function restore(force = false): Promise<HostSnapshot> {
   try {
     const config = await (await hostFetch("config", null)).json() as { demo: boolean; preview?: boolean };
     if (run !== generation) return state;
-    if (!config.demo && !config.preview) return emit({ status: "unavailable", session: null, trackId: null, error: "请在 QQ 音乐里打开同频。" });
+    if (!config.demo && !config.preview) return emit({ status: "unavailable", session: null, trackId: null, error: "体验暂时不可用，请稍后重试。" });
     profile = config.preview ? "preview" : "demo";
     const selected = sessionStorage.getItem(slotKey());
     if (selected !== "A" && selected !== "B") return emit({ status: "signed-out", session: null, trackId: null, error: null });
     slot = selected;
     const selectedIdentityKey = identityKey(), selectedTrackKey = trackKey();
-    const loadIdentity = async (): Promise<DemoIdentity | null> => {
-      if (run !== generation) return null;
+    const readIdentity = (): DemoIdentity | null => {
       let identity: DemoIdentity | null = null;
       try { identity = JSON.parse(localStorage.getItem(selectedIdentityKey) ?? "null"); } catch { /* Recover malformed local profile data. */ }
-      if (identity && (!UUID_PATTERN.test(identity.accountId ?? "") || !UUID_PATTERN.test(identity.deviceKey ?? ""))) identity = null;
-      if (identity?.signedOut && !force) return null;
-      if (!identity) {
-        identity = await (await hostFetch("create", null, { displayName: `模拟听众 ${selected}` })).json() as DemoIdentity;
-        localStorage.setItem(selectedIdentityKey, JSON.stringify(identity));
-      }
-      return identity;
+      return identity && UUID_PATTERN.test(identity.accountId ?? "") && UUID_PATTERN.test(identity.deviceKey ?? "") ? identity : null;
+    };
+    const loadIdentity = async (): Promise<DemoIdentity | null> => {
+      if (run !== generation) return null;
+      const identity = readIdentity();
+      if (identity) return identity.signedOut && !force ? null : identity;
+      const created = await (await hostFetch("create", null, { displayName: `模拟听众 ${selected}` })).json() as DemoIdentity;
+      localStorage.setItem(selectedIdentityKey, JSON.stringify(created));
+      return created;
     };
     // Tabs selecting the same local identity should not race to create two accounts.
-    const identity = navigator.locks ? await navigator.locks.request(`${profilePrefix()}-${selected}`, loadIdentity) : await loadIdentity();
+    const lockName = `${profilePrefix()}-${selected}`;
+    const withIdentityLock = async (job: () => Promise<DemoIdentity | null>): Promise<DemoIdentity | null> => navigator.locks ? await navigator.locks.request(lockName, job) : await job();
+    const requestSession = (identity: DemoIdentity) => fetch("/api/host/resume", { method: "POST", headers: { "Content-Type": "application/json", "X-Account-Id": identity.accountId }, body: JSON.stringify({ deviceKey: identity.deviceKey }), signal: AbortSignal.timeout(8000) });
+    let identity = await withIdentityLock(loadIdentity);
     if (run !== generation) return state;
     if (!identity) return emit({ status: "signed-out", session: null, trackId: null, error: null });
-    const response = await fetch("/api/host/resume", { method: "POST", headers: { "Content-Type": "application/json", "X-Account-Id": identity.accountId }, body: JSON.stringify({ deviceKey: identity.deviceKey }), signal: AbortSignal.timeout(8000) });
+    let response = await requestSession(identity);
+    if (run !== generation) return state;
+    // Only an explicitly rejected identity is replaced, once per restore attempt.
+    if (response.status === 401) {
+      const stale = identity;
+      identity = await withIdentityLock(async () => {
+        if (run !== generation) return null;
+        const current = readIdentity();
+        if (current && (current.accountId !== stale.accountId || current.deviceKey !== stale.deviceKey)) return current.signedOut && !force ? null : current;
+        localStorage.removeItem(selectedIdentityKey);
+        return loadIdentity();
+      });
+      if (run !== generation) return state;
+      if (!identity) return emit({ status: "signed-out", session: null, trackId: null, error: null });
+      response = await requestSession(identity);
+    }
     if (!response.ok) throw new Error("无法恢复登录，请稍后重试");
     const session = await response.json() as HostSession;
     if (run !== generation) return state;

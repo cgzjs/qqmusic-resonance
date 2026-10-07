@@ -69,8 +69,7 @@ html[data-theme="light"] {
 .appearance-toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 7px; min-height: 44px; min-width: 44px; padding: 0 10px; border: 1px solid var(--music-line); border-radius: 24px; color: var(--music-muted); background: var(--music-hover); font: 12px/1.4 "Segoe UI","Microsoft YaHei",sans-serif; cursor: pointer; }
 .appearance-toggle:hover { color: var(--music-accent); background: var(--music-accent-soft); }
 .appearance-toggle:focus-visible { outline: 2px solid var(--music-accent); outline-offset: 3px; }
-.music-app[data-authenticated="true"] .plugin-debug:not([open]) { right: 244px; }
-.music-app .account-controls, .music-app .plugin-debug[open] { box-shadow: var(--music-shadow); }
+.music-app .account-controls { box-shadow: var(--music-shadow); }
 .music-app .room-primary, .music-app .primary-action { color: var(--primary-foreground); background: var(--music-accent); }
 .music-app .room-primary:hover { filter: brightness(1.08); }
 .music-app .phone-stage__content { scrollbar-color: var(--music-line) transparent; }
@@ -134,7 +133,6 @@ html[data-theme="light"] .resonance-cover .terminal-cta { color: #fff; }
 .resonance-cover .appearance-toggle { margin-left: 0; }
 @media (max-width: 520px) {
   .music-account-menu summary { justify-content: center; min-width: 44px; }
-  .music-app[data-authenticated="true"] .plugin-debug:not([open]) { right: 166px; }
   .resonance-cover .terminal-header { gap: 10px; }
   .resonance-cover .appearance-toggle { width: 44px; padding: 0; }
   .resonance-cover .appearance-toggle > span { display: none; }

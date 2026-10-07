@@ -2,7 +2,6 @@ import type { AccountEnv } from "./host-api";
 
 type ImageAiBinding = { run: (model: string, input: unknown) => Promise<unknown> };
 type PlaceImageEnv = AccountEnv & { AI?: ImageAiBinding; AI_IMAGE_MODEL?: string; AI_IMAGE_PROVIDER?: string; TENCENT_TOKENHUB_API_KEY?: string; TENCENT_TOKENHUB_BASE_URL?: string; OPENAI_API_KEY?: string; OPENAI_BASE_URL?: string; OPENAI_IMAGE_MODEL?: string };
-const FALLBACK_IMAGE = "/assets/ambient/sound-postcard-bg.png";
 const DEFAULT_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const TENCENT_MODEL = "hy-image-v3";
 const TENCENT_ENDPOINT = "/v1/wand/hunyuan-image/v3-generation";
@@ -34,7 +33,7 @@ export function buildPlaceImagePrompt(track: string, artist: string, title: stri
 }
 
 async function tencentImage(prompt: string, env: PlaceImageEnv) {
-  if (!env.TENCENT_TOKENHUB_API_KEY) return null;
+  if (!env.TENCENT_TOKENHUB_API_KEY?.trim()) throw new Error("AI_NOT_CONFIGURED");
   const base = (env.TENCENT_TOKENHUB_BASE_URL || "https://tokenhub.tencentmaas.com").replace(/\/$/, "");
   const response = await fetch(`${base}${TENCENT_ENDPOINT}`, { method: "POST", headers: { Authorization: `Bearer ${env.TENCENT_TOKENHUB_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: TENCENT_MODEL, prompt, size: "768x1024", revise: false, footnote: "AI生成" }), signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error(`TENCENT_IMAGE_${response.status}`);
@@ -53,7 +52,7 @@ function base64Bytes(value: string) {
 }
 
 async function openAiImage(prompt: string, env: PlaceImageEnv) {
-  if (!env.OPENAI_API_KEY) return null;
+  if (!env.OPENAI_API_KEY?.trim()) throw new Error("AI_NOT_CONFIGURED");
   const base = (env.OPENAI_BASE_URL || "https://api.openai.com").replace(/\/$/, "");
   const response = await fetch(`${base}/v1/images/generations`, { method: "POST", headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: env.OPENAI_IMAGE_MODEL || OPENAI_MODEL, prompt, size: "1024x1536", quality: "low", output_format: "jpeg", output_compression: 78, moderation: "auto", n: 1 }), signal: AbortSignal.timeout(60000) });
   if (!response.ok) throw new Error(`OPENAI_IMAGE_${response.status}`);
@@ -73,20 +72,23 @@ export async function placeImageApi(request: Request, env: PlaceImageEnv) {
   try { body = await request.json(); } catch { return Response.json({ error: "INVALID_BODY" }, { status: 400 }); }
   if (!body?.track || !valid(body.track.track, 120) || !valid(body.track.artist, 120) || (body.title !== undefined && !valid(body.title, 40))) return Response.json({ error: "INVALID_BODY" }, { status: 400 });
   const prompt = buildPlaceImagePrompt((body.track.track as string).trim(), (body.track.artist as string).trim(), typeof body.title === "string" ? body.title.trim() : "");
+  const notConfigured = () => Response.json({ error: "AI_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   if (env.AI_IMAGE_PROVIDER === "openai") {
-    try { return await openAiImage(prompt, env) || Response.json({ source: "fallback", imageUrl: FALLBACK_IMAGE }); }
+    if (!env.OPENAI_API_KEY?.trim()) return notConfigured();
+    try { return await openAiImage(prompt, env); }
     catch (error) { const failure = providerError(error); return Response.json({ error: failure.error, provider: "openai" }, { status: failure.status }); }
   }
-  if (env.TENCENT_TOKENHUB_API_KEY) {
-    try { return await tencentImage(prompt, env) || Response.json({ source: "fallback", imageUrl: FALLBACK_IMAGE }); }
+  if (env.TENCENT_TOKENHUB_API_KEY?.trim()) {
+    try { return await tencentImage(prompt, env); }
     catch (error) { const failure = providerError(error); return Response.json({ error: failure.error, provider: "tencent" }, { status: failure.status }); }
   }
-  if (!env.AI) return Response.json({ source: "fallback", imageUrl: FALLBACK_IMAGE });
+  if (env.AI_IMAGE_PROVIDER === "tencent" || !env.AI) return notConfigured();
   try {
     const result = await env.AI.run(env.AI_IMAGE_MODEL || DEFAULT_MODEL, { prompt });
     if (result instanceof ReadableStream) return new Response(result as ReadableStream<Uint8Array>, { headers: { "Content-Type": "image/png", "Cache-Control": "no-store" } });
-  } catch {
-    // Keep the demo usable when the optional image model is unavailable.
+  } catch (error) {
+    const failure = providerError(error);
+    return Response.json({ error: failure.error, provider: "cloudflare" }, { status: failure.status });
   }
-  return Response.json({ source: "fallback", imageUrl: FALLBACK_IMAGE });
+  return Response.json({ error: "AI_UNAVAILABLE", provider: "cloudflare" }, { status: 503 });
 }

@@ -81,7 +81,18 @@ export default defineConfig(async ({ command }) => {
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
-        config: { ...localBindingConfig, vars: { DEMO_HOST_ENABLED: command === "serve" ? "true" : "false" } },
+        config: {
+          ...localBindingConfig,
+          ...(command === "build" ? {
+            name: "qqmusic-resonance",
+            routes: [{ pattern: "resonance.de5.net", custom_domain: true }],
+            workers_dev: true,
+          } : {}),
+          vars: {
+            DEMO_HOST_ENABLED: command === "serve" ? "true" : "false",
+            ...(command === "build" ? { PUBLIC_DEMO_ORIGIN: "https://resonance.de5.net", AI_IMAGE_PROVIDER: "tencent" } : {}),
+          },
+        },
       }),
     ],
   };
