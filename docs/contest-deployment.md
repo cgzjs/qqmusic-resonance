@@ -7,7 +7,7 @@
 ## 启用边界
 
 - `DEMO_HOST_ENABLED=true` 仍只允许 localhost、127.0.0.1、::1 的本机联调。
-- 参赛体验默认关闭。仅在部署平台显式设置 `PUBLIC_DEMO_ORIGIN` 后启用，值是访问站点的精确 origin，例如 `https://example.com`，不能包含路径、通配符或账号密码。
+- 参赛体验仅在显式配置 `PUBLIC_DEMO_ORIGIN` 的精确 origin 下启用，不能包含路径、通配符或账号密码。当前生产构建显式配置 `https://resonance.de5.net`，其他域名仍关闭体验；更换生产入口时需同步修改 `vite.config.ts` 的域名路由与 origin。
 - 公网 origin 必须使用 HTTPS；HTTP 仅允许回环地址，供本地生产预览使用。
 - 每个访客通过原有随机身份与设备证明建立自己的体验账号，凭据以摘要保存；不接受真实 QQ 身份或官方令牌。
 - 浏览器保存的身份在恢复时被明确返回 401，会在当前账号范围内重建一次演示身份；网络错误、超时或服务故障保留原身份。取消登录后的旧响应不会删除身份或覆盖状态，同一身份的并发恢复在 Web Locks 可用时共用一次重建。
@@ -67,7 +67,7 @@ Windows 下构建前停止使用 `dist` 的本地生产预览，避免文件锁�
 | `AI_IMAGE_PROVIDER` | Variable | `tencent` |
 | `TENCENT_TOKENHUB_API_KEY` | Secret | 自己的 TokenHub 密钥 |
 
-保存并部署设置。不要将密钥写进 Wrangler 配置、Git 或前端环境变量。更换域名时同步更新 `PUBLIC_DEMO_ORIGIN`。
+当前生产构建已将 `resonance.de5.net` 自定义域名路由、对应 origin、`DEMO_HOST_ENABLED=false` 与 `AI_IMAGE_PROVIDER=tencent` 写入生成配置，使重新构建与自动发布保持同一入口。生图密钥继续保存在 Worker Secret 中。不要将密钥写进 Wrangler 配置、Git 或前端环境变量。更换域名时同步更新 `vite.config.ts` 的路由与 origin。
 
 ### Pages 入口与自定义域名
 

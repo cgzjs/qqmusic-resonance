@@ -41,7 +41,7 @@ npm run dev
 npm run build
 ```
 
-参赛体验的本地生产预览：构建后运行 `npm run preview:contest`，访问 `http://127.0.0.1:8788`。它使用独立体验账号与存储，不放开原有本机联调限制。Cloudflare 部署使用 `npm run deploy`，Pages 入口使用 `npm run deploy:pages`；公开登录需在后端 Worker 显式配置精确的 `PUBLIC_DEMO_ORIGIN`，默认关闭。部署流程与验收见 [参赛部署说明](./docs/contest-deployment.md)。
+参赛体验的本地生产预览：构建后运行 `npm run preview:contest`，访问 `http://127.0.0.1:8788`。它使用独立体验账号与存储，不放开原有本机联调限制。Cloudflare 部署使用 `npm run deploy`，Pages 入口使用 `npm run deploy:pages`；当前生产构建显式配置 `https://resonance.de5.net` 的域名路由与公开登录 origin，其他域名仍关闭体验。部署流程与验收见 [参赛部署说明](./docs/contest-deployment.md)。
 
 ## 项目结构
 
