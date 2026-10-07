@@ -41,7 +41,7 @@ npm run dev
 npm run build
 ```
 
-参赛体验的本地生产预览：构建后运行 `npm run preview:contest`，访问 `http://127.0.0.1:8788`。它使用独立体验账号与存储，不放开原有本机联调限制；后续部署需显式配置精确的 `PUBLIC_DEMO_ORIGIN`，默认关闭。准备与验证见 [参赛部署说明](./docs/contest-deployment.md)。当前尚未发布。
+参赛体验的本地生产预览：构建后运行 `npm run preview:contest`，访问 `http://127.0.0.1:8788`。它使用独立体验账号与存储，不放开原有本机联调限制。Cloudflare 部署使用 `npm run deploy`，Pages 入口使用 `npm run deploy:pages`；公开登录需在后端 Worker 显式配置精确的 `PUBLIC_DEMO_ORIGIN`，默认关闭。部署流程与验收见 [参赛部署说明](./docs/contest-deployment.md)。
 
 ## 项目结构
 
@@ -104,7 +104,7 @@ docs/
 
 保持开发服务运行后，当前歌单可运行 `test:nearby:integration`、`test:playlist:integration`、`test:login:integration`、`test:replies:integration`、`test:received:integration`，可用 `ROOM_TEST_URL` 指定地址。其余历史多人集成用例使用固定的合成试听 ID，需要原始试听配置；不能将它们直接用于当前自备歌单。
 
-当前少量歌曲使用完整缓冲支持进度跳转，不是流媒体曲库方案。验证覆盖同一电脑的两个浏览器会话；真实 QQ SDK、地理位置、双手机锁屏/网络切换及公网部署尚未验收。
+当前少量歌曲使用完整缓冲支持进度跳转，不是流媒体曲库方案。验证覆盖同一电脑的两个浏览器会话及 Cloudflare 上的账号、地点留声、共听连接与混元生图接口；目标域名的最新版本部署仍需单独验收，真实 QQ SDK、地理位置、双手机锁屏与移动网络切换尚未验收。
 
 ## License
 

@@ -1,0 +1,8 @@
+{
+  "name": "qqmusic-resonance",
+  "pages_build_output_dir": "../../.wrangler/pages",
+  "compatibility_date": "2026-05-15",
+  "services": [
+    { "binding": "APP", "service": "qqmusic-resonance" }
+  ]
+}
